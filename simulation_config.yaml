@@ -5,10 +5,6 @@ map:
   origin_lng: -8.660
   cell_size_m: 50
 
-entities:
-  num_drones: 0
-  num_sensors: 2
-
 radio:
   drone_range_m: 150
   base_range_m: 300

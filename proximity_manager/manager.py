@@ -18,11 +18,13 @@ class ProximityManager:
         self._drone_range: float = config["radio"]["drone_range_m"]
         self._base_range: float = config["radio"]["base_range_m"]
         self._tick_ms: int = config["simulation"]["tick_real_ms"]
-        self._expected: int = config["entities"]["num_drones"] + config["entities"]["num_sensors"]
+        _num_drones = int(os.getenv("NUM_DRONES", "0"))
+        _num_sensors = int(os.getenv("NUM_SENSORS", "2"))
+        self._expected: int = _num_drones + _num_sensors
         self._meta = {
             "map": config["map"],
-            "num_drones": config["entities"]["num_drones"],
-            "num_sensors": config["entities"]["num_sensors"],
+            "num_drones": _num_drones,
+            "num_sensors": _num_sensors,
         }
         self._entities: dict[int, Entity] = {}
         self._matrix = ConnectivityMatrix()
