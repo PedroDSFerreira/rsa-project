@@ -23,6 +23,7 @@ class ProximityManager:
         self._expected: int = _num_drones + _num_sensors
         self._meta = {
             "map": config["map"],
+            "base_station": config["base_station"],
             "num_drones": _num_drones,
             "num_sensors": _num_sensors,
         }
