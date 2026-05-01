@@ -32,13 +32,13 @@ docker exec node-b mosquitto_pub -t "vanetza/in/cam" -f /examples/in_cam.json
 **Goal:** A Python service reads simulated positions and dynamically blocks/unblocks MAC addresses. Verify that communication is physically gated by proximity.
 
 ### Tasks
-- [ ] Create `proximity_manager/` with `Dockerfile`, `requirements.txt` (`paho-mqtt`, `docker`)
-- [ ] Implement `proximity.py`: connectivity matrix, `block(container, mac)` / `unblock(container, mac)` via Docker SDK
-- [ ] Implement `main.py`: read `simulation_config.yaml`, subscribe to `mqtt-central` `vanetza/out/cam` for drone positions, compute haversine distances each tick, call `proximity.py`
-- [ ] Publish `sim/meta` (retained) to `mqtt-central` on startup: `{ "map": {...}, "num_drones": N, "num_sensors": M }`
-- [ ] Publish `sim/links` each tick: `{ "connected": [[id_a, id_b], ...], "tick": N }`
-- [ ] Start all containers with all MACs fully blocked (isolated by default)
-- [ ] Add ProximityManager to `docker-compose.dev.yml` with Docker socket mounted
+- [x] Create `proximity_manager/` with `Dockerfile`, `requirements.txt` (`paho-mqtt`, `docker`)
+- [x] Implement `proximity.py`: connectivity matrix, `block(container, mac)` / `unblock(container, mac)` via Docker SDK
+- [x] Implement `main.py`: read `simulation_config.yaml`, subscribe to `mqtt-central` `vanetza/out/cam` for drone positions, compute haversine distances each tick, call `proximity.py`
+- [x] Publish `sim/meta` (retained) to `mqtt-central` on startup: `{ "map": {...}, "num_drones": N, "num_sensors": M }`
+- [x] Publish `sim/links` each tick: `{ "connected": [[id_a, id_b], ...], "tick": N }`
+- [x] Start all containers with all MACs fully blocked (isolated by default)
+- [x] Add ProximityManager to `docker-compose.dev.yml` with Docker socket mounted
 
 ### Acceptance Test
 ```bash
