@@ -45,42 +45,54 @@ class ProximityManager:
         self.entities: dict[int, Entity] = {}
         self.matrix = ConnectivityMatrix()
         self.tick = 0
-
-        # Pre-populate entities from static_nodes so blocking works before any CAM arrives
-        for node in config.get("static_nodes", []):
-            self.entities[node["station_id"]] = Entity(
-                node["station_id"],
-                node["container_name"],
-                node["mac"],
-                node["lat"],
-                node["lng"],
-            )
+        self._expected = config["entities"]["num_drones"] + config["entities"]["num_sensors"]
 
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="proximity-manager")
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
 
     def _on_connect(self, client, userdata, flags, reason_code, properties):
-        print(f"Connected to mqtt-central: {reason_code}")
+        print(f"Connected to mqtt-central: {reason_code}", flush=True)
+        client.subscribe("sim/announce")
         client.subscribe("+/vanetza/own/cam")
 
     def _on_message(self, client, userdata, msg):
         try:
             payload = json.loads(msg.payload)
+        except json.JSONDecodeError:
+            return
+
+        if msg.topic == "sim/announce":
+            self._handle_announce(payload)
+        else:
+            self._handle_cam(payload)
+
+    def _handle_announce(self, payload: dict):
+        station_id = payload["station_id"]
+        if station_id not in self.entities:
+            self.entities[station_id] = Entity(
+                station_id,
+                payload["container_name"],
+                payload["mac"],
+                payload["lat"],
+                payload["lng"],
+            )
+            print(
+                f"Announced: stationId={station_id} container={payload['container_name']}"
+                f" type={payload['entity_type']} ({len(self.entities)}/{self._expected})",
+                flush=True,
+            )
+
+    def _handle_cam(self, payload: dict):
+        try:
             station_id = payload["stationID"]
-            station_addr = payload["stationAddr"]
             position = payload["fields"]["cam"]["camParameters"]["basicContainer"]["referencePosition"]
             lat = position["latitude"]
             lng = position["longitude"]
-
-            if station_id not in self.entities:
-                container_name = f"project-node-{chr(ord('a') + station_id - 10)}-1"
-                self.entities[station_id] = Entity(station_id, container_name, station_addr, lat, lng)
-                print(f"Registered entity: stationId={station_id} container={container_name}")
-            else:
+            if station_id in self.entities:
                 self.entities[station_id].lat = lat
                 self.entities[station_id].lng = lng
-        except (KeyError, json.JSONDecodeError):
+        except KeyError:
             pass
 
     def _publish_meta(self):
@@ -119,8 +131,6 @@ class ProximityManager:
             for j in range(i + 1, len(ids)):
                 a = self.entities[ids[i]]
                 b = self.entities[ids[j]]
-                # Call block() directly and seed state as False so the matrix
-                # only transitions to True (unblock) when distance is within range.
                 block(a.container_name, b.mac)
                 block(b.container_name, a.mac)
                 self.matrix._state[self.matrix._key(a.container_name, b.container_name)] = False
@@ -130,14 +140,15 @@ class ProximityManager:
         self.client.connect(MQTT_HOST, MQTT_PORT)
         self.client.loop_start()
 
-        # Wait until vanetza finishes its own ingress qdisc setup, then block and
-        # verify each filter actually stuck (retry up to 30s).
-        import time as _t
+        print(f"Waiting for {self._expected} entities to announce...", flush=True)
+        while len(self.entities) < self._expected:
+            time.sleep(0.5)
+        print(f"All {self._expected} entities announced — starting proximity loop", flush=True)
+
         from proximity import filter_present
-        deadline = _t.monotonic() + 30
-        while _t.monotonic() < deadline:
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
             self._block_all()
-            # Check that at least one filter landed; retry if not
             ids = list(self.entities.keys())
             if len(ids) >= 2:
                 a = self.entities[ids[0]]
@@ -145,11 +156,12 @@ class ProximityManager:
                 if filter_present(a.container_name, b.mac):
                     break
             else:
-                break  # nothing to verify
+                break
             print("Filter not confirmed — retrying in 1s...", flush=True)
-            _t.sleep(1)
+            time.sleep(1)
+
         self._publish_meta()
-        print("Published sim/meta")
+        print("Published sim/meta", flush=True)
 
         while True:
             start = time.monotonic()
