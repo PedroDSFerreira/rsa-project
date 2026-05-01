@@ -47,6 +47,28 @@ services:
       vanetzalan0:
         ipv4_address: 192.168.98.3
 
+  dashboard-backend:
+    build: ./dashboard/backend
+    depends_on:
+      - mqtt-central
+    environment:
+      - MQTT_HOST=mqtt-central
+      - MQTT_PORT=1883
+    ports:
+      - "8000:8000"
+    networks:
+      vanetzalan0:
+        ipv4_address: 192.168.98.4
+
+  dashboard-frontend:
+    build: ./dashboard/frontend
+    depends_on:
+      - dashboard-backend
+    ports:
+      - "3000:80"
+    networks:
+      - vanetzalan0
+
 networks:
   vanetzalan0:
     driver: bridge
