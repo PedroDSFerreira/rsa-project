@@ -1,7 +1,20 @@
 services:
+  mqtt-central:
+    image: eclipse-mosquitto:2
+    hostname: mqtt-central
+    ports:
+      - "1884:1883"
+    volumes:
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      vanetzalan0:
+        ipv4_address: 192.168.98.2
+
   node-a:
     image: ghcr.io/nap-it/vanetza-nap:latest
     hostname: node-a
+    depends_on:
+      - mqtt-central
     cap_add:
       - NET_ADMIN
     environment:
@@ -15,6 +28,8 @@ services:
       - VANETZA_CAM_PERIODICITY=1000
       - START_EMBEDDED_MOSQUITTO=true
       - SUPPORT_MAC_BLOCKING=true
+      - VANETZA_REMOTE_MQTT_BROKER=mqtt-central
+      - VANETZA_REMOTE_MQTT_PORT=1883
     networks:
       vanetzalan0:
         ipv4_address: 192.168.98.10
@@ -22,6 +37,8 @@ services:
   node-b:
     image: ghcr.io/nap-it/vanetza-nap:latest
     hostname: node-b
+    depends_on:
+      - mqtt-central
     cap_add:
       - NET_ADMIN
     environment:
@@ -35,6 +52,8 @@ services:
       - VANETZA_CAM_PERIODICITY=1000
       - START_EMBEDDED_MOSQUITTO=true
       - SUPPORT_MAC_BLOCKING=true
+      - VANETZA_REMOTE_MQTT_BROKER=mqtt-central
+      - VANETZA_REMOTE_MQTT_PORT=1883
     networks:
       vanetzalan0:
         ipv4_address: 192.168.98.11

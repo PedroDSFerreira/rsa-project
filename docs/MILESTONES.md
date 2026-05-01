@@ -11,7 +11,7 @@ Each milestone produces a **testable, runnable state** of the system. Later mile
 ### Tasks
 - [x] Create `docker-compose.dev.yml` with two vanetza-nap containers (`node-a`, `node-b`) on `vanetzalan0`
 - [x] Configure unique `VANETZA_STATION_ID`, `VANETZA_MAC_ADDRESS`, static IPs, `START_EMBEDDED_MOSQUITTO=true`, `SUPPORT_MAC_BLOCKING=true`
-- [ ] Add `mqtt-central` (Mosquitto) container; configure both vanetza nodes with `VANETZA_REMOTE_MQTT_BROKER=mqtt-central`
+- [x] Add `mqtt-central` (Mosquitto) container; configure both vanetza nodes with `VANETZA_REMOTE_MQTT_BROKER=mqtt-central`
 - [ ] Verify CAM exchange: subscribe to `vanetza/out/cam` on `node-a`'s local broker and confirm CAMs from `node-b` arrive
 
 ### Acceptance Test
