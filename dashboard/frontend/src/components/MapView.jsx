@@ -29,6 +29,10 @@ export default function MapView() {
 
   const entityList = Object.values(entities)
 
+  const baseStation = meta?.base_station
+    ? [meta.base_station.lat, meta.base_station.lng]
+    : null
+
   const linkLines = links.map(([idA, idB]) => {
     const a = entities[idA]
     const b = entities[idB]
@@ -42,6 +46,14 @@ export default function MapView() {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution="© OpenStreetMap contributors"
       />
+      {baseStation && (
+        <Marker position={baseStation} icon={entityIcon('base_station')}>
+          <Popup>
+            <strong>base station</strong><br />
+            {baseStation[0].toFixed(5)}, {baseStation[1].toFixed(5)}
+          </Popup>
+        </Marker>
+      )}
       {entityList.map((e) => (
         <Marker key={e.station_id} position={[e.lat, e.lng]} icon={entityIcon(e.entity_type)}>
           <Popup>
