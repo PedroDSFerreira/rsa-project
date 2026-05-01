@@ -54,15 +54,18 @@ export default function MapView() {
           </Popup>
         </Marker>
       )}
-      {entityList.map((e) => (
-        <Marker key={e.station_id} position={[e.lat, e.lng]} icon={entityIcon(e.entity_type)}>
-          <Popup>
-            <strong>{e.entity_type} {e.station_id}</strong><br />
-            {e.container_name}<br />
-            {e.lat.toFixed(5)}, {e.lng.toFixed(5)}
-          </Popup>
-        </Marker>
-      ))}
+      {entityList.map((e) => {
+        const idx = e.container_name?.match(/-([0-9]+)$/)?.[1] ?? e.station_id
+        return (
+          <Marker key={e.station_id} position={[e.lat, e.lng]} icon={entityIcon(e.entity_type)}>
+            <Popup>
+              <strong>{e.entity_type} #{idx}</strong><br />
+              {e.container_name}<br />
+              {e.lat.toFixed(5)}, {e.lng.toFixed(5)}
+            </Popup>
+          </Marker>
+        )
+      })}
       {linkLines}
     </MapContainer>
   )
