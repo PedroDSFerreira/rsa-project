@@ -10,56 +10,6 @@ services:
       vanetzalan0:
         ipv4_address: 192.168.98.2
 
-  node-a:
-    image: ghcr.io/nap-it/vanetza-nap:latest
-    hostname: node-a
-    depends_on:
-      - mqtt-central
-    cap_add:
-      - NET_ADMIN
-    environment:
-      - VANETZA_STATION_ID=10
-      - VANETZA_STATION_TYPE=5
-      - VANETZA_MAC_ADDRESS=6e:06:e0:03:00:0a
-      - VANETZA_INTERFACE=br0
-      - VANETZA_USE_HARDCODED_GPS=true
-      - VANETZA_LATITUDE=40.630
-      - VANETZA_LONGITUDE=-8.660
-      - VANETZA_CAM_PERIODICITY=60000
-      - START_EMBEDDED_MOSQUITTO=true
-      - SUPPORT_MAC_BLOCKING=true
-      - VANETZA_REMOTE_MQTT_BROKER=mqtt-central
-      - VANETZA_REMOTE_MQTT_PORT=1883
-      - PEER_MACS=6e:06:e0:03:00:0b
-    networks:
-      vanetzalan0:
-        ipv4_address: 192.168.98.10
-
-  node-b:
-    image: ghcr.io/nap-it/vanetza-nap:latest
-    hostname: node-b
-    depends_on:
-      - mqtt-central
-    cap_add:
-      - NET_ADMIN
-    environment:
-      - VANETZA_STATION_ID=11
-      - VANETZA_STATION_TYPE=5
-      - VANETZA_MAC_ADDRESS=6e:06:e0:03:00:0b
-      - VANETZA_INTERFACE=br0
-      - VANETZA_USE_HARDCODED_GPS=true
-      - VANETZA_LATITUDE=40.634
-      - VANETZA_LONGITUDE=-8.660
-      - VANETZA_CAM_PERIODICITY=60000
-      - START_EMBEDDED_MOSQUITTO=true
-      - SUPPORT_MAC_BLOCKING=true
-      - VANETZA_REMOTE_MQTT_BROKER=mqtt-central
-      - VANETZA_REMOTE_MQTT_PORT=1883
-      - PEER_MACS=6e:06:e0:03:00:0a
-    networks:
-      vanetzalan0:
-        ipv4_address: 192.168.98.11
-
   sensor:
     build: ./apps/sensor
     depends_on:
@@ -86,8 +36,6 @@ services:
     build: ./proximity_manager
     depends_on:
       - mqtt-central
-      - node-a
-      - node-b
     volumes:
       - ./simulation_config.yaml:/config/simulation_config.yaml
       - /var/run/docker.sock:/var/run/docker.sock
