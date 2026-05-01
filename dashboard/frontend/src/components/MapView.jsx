@@ -60,7 +60,6 @@ export default function MapView() {
           <Marker key={e.station_id} position={[e.lat, e.lng]} icon={entityIcon(e.entity_type)}>
             <Popup>
               <strong>{e.entity_type} #{idx}</strong><br />
-              {e.container_name}<br />
               {e.lat.toFixed(5)}, {e.lng.toFixed(5)}<br />
               <small style={{color:'#888'}}>id: {e.station_id}</small>
             </Popup>
