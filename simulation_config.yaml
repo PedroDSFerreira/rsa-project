@@ -20,3 +20,17 @@ simulation:
 base_station:
   lat: 40.630
   lng: -8.660
+
+# Static nodes known at startup — ProximityManager blocks all pairs on init.
+# container_name must match the Docker Compose service name used by the Docker SDK.
+static_nodes:
+  - station_id: 10
+    container_name: project-node-a-1
+    mac: "6e:06:e0:03:00:0a"
+    lat: 40.630
+    lng: -8.660
+  - station_id: 11
+    container_name: project-node-b-1
+    mac: "6e:06:e0:03:00:0b"
+    lat: 40.634
+    lng: -8.660

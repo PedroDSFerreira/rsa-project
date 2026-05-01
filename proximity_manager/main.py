@@ -46,13 +46,23 @@ class ProximityManager:
         self.matrix = ConnectivityMatrix()
         self.tick = 0
 
+        # Pre-populate entities from static_nodes so blocking works before any CAM arrives
+        for node in config.get("static_nodes", []):
+            self.entities[node["station_id"]] = Entity(
+                node["station_id"],
+                node["container_name"],
+                node["mac"],
+                node["lat"],
+                node["lng"],
+            )
+
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="proximity-manager")
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
 
     def _on_connect(self, client, userdata, flags, reason_code, properties):
         print(f"Connected to mqtt-central: {reason_code}")
-        client.subscribe("obu+/vanetza/own/cam")
+        client.subscribe("+/vanetza/own/cam")
 
     def _on_message(self, client, userdata, msg):
         try:
@@ -101,11 +111,43 @@ class ProximityManager:
         self._publish_links(connected_ids)
         self.tick += 1
 
+    def _block_all(self):
+        """Block all entity pairs on startup — nodes start fully isolated."""
+        from proximity import block
+        ids = list(self.entities.keys())
+        for i in range(len(ids)):
+            for j in range(i + 1, len(ids)):
+                a = self.entities[ids[i]]
+                b = self.entities[ids[j]]
+                # Call block() directly and seed state as False so the matrix
+                # only transitions to True (unblock) when distance is within range.
+                block(a.container_name, b.mac)
+                block(b.container_name, a.mac)
+                self.matrix._state[self.matrix._key(a.container_name, b.container_name)] = False
+        print(f"Blocked all pairs: {len(ids)} nodes, {len(ids)*(len(ids)-1)//2} pairs", flush=True)
+
     def run(self):
         self.client.connect(MQTT_HOST, MQTT_PORT)
         self.client.loop_start()
 
-        time.sleep(2)
+        # Wait until vanetza finishes its own ingress qdisc setup, then block and
+        # verify each filter actually stuck (retry up to 30s).
+        import time as _t
+        from proximity import filter_present
+        deadline = _t.monotonic() + 30
+        while _t.monotonic() < deadline:
+            self._block_all()
+            # Check that at least one filter landed; retry if not
+            ids = list(self.entities.keys())
+            if len(ids) >= 2:
+                a = self.entities[ids[0]]
+                b = self.entities[ids[1]]
+                if filter_present(a.container_name, b.mac):
+                    break
+            else:
+                break  # nothing to verify
+            print("Filter not confirmed — retrying in 1s...", flush=True)
+            _t.sleep(1)
         self._publish_meta()
         print("Published sim/meta")
 
