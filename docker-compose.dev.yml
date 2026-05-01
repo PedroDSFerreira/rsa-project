@@ -7,8 +7,7 @@ services:
     volumes:
       - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
     networks:
-      vanetzalan0:
-        ipv4_address: 192.168.98.2
+      - vanetzalan0
 
   sensor:
     build: ./apps/sensor
@@ -30,7 +29,7 @@ services:
     networks:
       - vanetzalan0
     deploy:
-      replicas: 2
+      replicas: ${NUM_SENSORS:-2}
 
   proximity-manager:
     build: ./proximity_manager
@@ -43,9 +42,10 @@ services:
       - PYTHONUNBUFFERED=1
       - MQTT_HOST=mqtt-central
       - MQTT_PORT=1883
+      - NUM_SENSORS=${NUM_SENSORS:-2}
+      - NUM_DRONES=${NUM_DRONES:-0}
     networks:
-      vanetzalan0:
-        ipv4_address: 192.168.98.3
+      - vanetzalan0
 
   dashboard-backend:
     build: ./dashboard/backend
@@ -57,8 +57,7 @@ services:
     ports:
       - "8000:8000"
     networks:
-      vanetzalan0:
-        ipv4_address: 192.168.98.4
+      - vanetzalan0
 
   dashboard-frontend:
     build: ./dashboard/frontend
@@ -72,6 +71,3 @@ services:
 networks:
   vanetzalan0:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 192.168.98.0/24
