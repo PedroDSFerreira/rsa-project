@@ -60,6 +60,48 @@ services:
       vanetzalan0:
         ipv4_address: 192.168.98.11
 
+  sensor-1:
+    image: ghcr.io/nap-it/vanetza-nap:latest
+    hostname: sensor-1
+    depends_on:
+      - mqtt-central
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - VANETZA_STATION_ID=20
+      - VANETZA_STATION_TYPE=10
+      - VANETZA_MAC_ADDRESS=6e:06:e0:03:00:14
+      - VANETZA_INTERFACE=br0
+      - VANETZA_USE_HARDCODED_GPS=true
+      - VANETZA_LATITUDE=40.6315
+      - VANETZA_LONGITUDE=-8.660
+      - VANETZA_CAM_PERIODICITY=2000
+      - START_EMBEDDED_MOSQUITTO=true
+      - SUPPORT_MAC_BLOCKING=true
+      - VANETZA_REMOTE_MQTT_BROKER=mqtt-central
+      - VANETZA_REMOTE_MQTT_PORT=1883
+    networks:
+      vanetzalan0:
+        ipv4_address: 192.168.98.20
+    ports:
+      - "1885:1883"
+
+  sensor-1-app:
+    build: ./apps/sensor
+    hostname: sensor-1-app
+    depends_on:
+      - sensor-1
+    environment:
+      - SENSOR_ID=20
+      - SENSOR_LAT=40.6315
+      - SENSOR_LNG=-8.660
+      - MQTT_HOST=sensor-1
+      - MQTT_PORT=1883
+      - PYTHONUNBUFFERED=1
+    networks:
+      vanetzalan0:
+        ipv4_address: 192.168.98.21
+
   proximity-manager:
     build: ./proximity_manager
     depends_on:
