@@ -1,6 +1,6 @@
 import os
 
-from config import load_config
+from infra.config import load_config
 from manager import ProximityManager
 
 CONFIG_PATH = os.getenv("CONFIG_PATH", "/config/simulation_config.yaml")

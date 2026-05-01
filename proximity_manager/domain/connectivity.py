@@ -1,4 +1,4 @@
-from mac_filter import block, unblock
+from infra.mac_filter import block, unblock
 
 
 class ConnectivityMatrix:

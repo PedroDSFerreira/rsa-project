@@ -4,10 +4,10 @@ import time
 
 import paho.mqtt.client as mqtt
 
-from connectivity import ConnectivityMatrix
-from entity import Entity
-from geo import haversine
-from mac_filter import block, filter_present
+from domain.connectivity import ConnectivityMatrix
+from domain.entity import Entity
+from domain.geo import haversine
+from infra.mac_filter import block, filter_present
 
 MQTT_HOST = os.getenv("MQTT_HOST", "mqtt-central")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
