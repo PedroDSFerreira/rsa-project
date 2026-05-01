@@ -186,8 +186,9 @@ subscribe vanetza/out/denm ◄─ decode + JSON ◄──── received frame o
 | App → Vanetza | `vanetza/in/denm` | drone-app | vanetza | Coverage events |
 | Vanetza → App | `vanetza/out/cam` | vanetza | drone-app, base-app | Incoming CAMs from other nodes |
 | Vanetza → App | `vanetza/out/denm` | vanetza | drone-app | Incoming DENMs |
-| Vanetza → Central | `vanetza/out/cam` | vanetza (remote fwd) | ProximityManager, dashboard | All network CAMs |
-| Vanetza → Central | `vanetza/out/denm` | vanetza (remote fwd) | dashboard | All network DENMs |
+| Vanetza → Central | `obu{id}/vanetza/out/cam` | vanetza (remote fwd) | ProximityManager, dashboard | CAMs received by station `id` from others |
+| Vanetza → Central | `obu{id}/vanetza/own/cam` | vanetza (remote fwd) | ProximityManager, dashboard | Self-generated CAMs from station `id` |
+| Vanetza → Central | `obu{id}/vanetza/out/denm` | vanetza (remote fwd) | dashboard | DENMs received by station `id` |
 | Drone App → Sensor | `sensor/request_data` | drone-app | sensor-app | Request to collect sensor data |
 | Sensor App → Drone | `sensor/data_response` | sensor-app | drone-app | Synthetic environmental data payload |
 | ProximityManager → Central | `sim/links` | proximity-manager | dashboard | Current connectivity matrix (each tick) |
