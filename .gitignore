@@ -1,2 +1,4 @@
 docs/
 scripts/
+dashboard/frontend/node_modules/
+dashboard/frontend/dist/
