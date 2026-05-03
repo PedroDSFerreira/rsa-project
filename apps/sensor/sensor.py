@@ -49,7 +49,7 @@ class SensorAgent:
             "lat":            self._identity.lat,
             "lng":            self._identity.lng,
             "entity_type":    "sensor",
-        }), retain=True)
+        }))
         c.disconnect()
         print(
             f"Sensor {self._identity.station_id} announced at"

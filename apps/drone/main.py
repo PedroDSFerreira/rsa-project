@@ -82,7 +82,7 @@ class DroneAgent:
             "lat":            self._lat,
             "lng":            self._lng,
             "entity_type":    "drone",
-        }), retain=True)
+        }))
 
     def run(self):
         self._central.connect(MQTT_CENTRAL_HOST, MQTT_CENTRAL_PORT)

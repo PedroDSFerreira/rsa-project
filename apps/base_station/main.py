@@ -31,7 +31,7 @@ def _announce(ip: str):
         "lat":            LAT,
         "lng":            LNG,
         "entity_type":    "base_station",
-    }), retain=True)
+    }))
     c.disconnect()
 
 
