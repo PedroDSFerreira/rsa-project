@@ -5,10 +5,10 @@ import socket
 import paho.mqtt.client as mqtt
 
 STATION_ID = 1
+CONTAINER_NAME = "base_station"
 LAT = float(os.environ["VANETZA_LATITUDE"])
 LNG = float(os.environ["VANETZA_LONGITUDE"])
 MAC = os.environ["VANETZA_MAC_ADDRESS"]
-CONTAINER_NAME = os.environ["BASE_STATION_CONTAINER_NAME"]
 
 MQTT_CENTRAL_HOST = os.getenv("MQTT_HOST", "mqtt-central")
 MQTT_CENTRAL_PORT = int(os.getenv("MQTT_PORT", "1883"))

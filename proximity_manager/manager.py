@@ -91,8 +91,9 @@ class ProximityManager:
                 a = self._entities[ids[i]]
                 b = self._entities[ids[j]]
                 dist = haversine(a.lat, a.lng, b.lat, b.lng)
-                self._matrix.update(a.container_name, b.container_name, a.mac, b.mac, dist <= self._range_between(a, b))
-                if dist <= self._range_between(a, b):
+                in_range = dist <= self._range_between(a, b)
+                self._matrix.update(a.container_name, b.container_name, a.mac, b.mac, in_range)
+                if in_range:
                     connected.append([a.station_id, b.station_id])
         self._client.publish("sim/links", json.dumps({"connected": connected, "tick": self._tick}))
         self._tick += 1
@@ -130,9 +131,8 @@ class ProximityManager:
     def run(self):
         self._client.connect(MQTT_HOST, MQTT_PORT)
         self._client.loop_start()
-        # Clear retained messages from any previous run before accepting new entities
-        for topic in ("sim/meta", "sim/links"):
-            self._client.publish(topic, payload=None, retain=True)
+        # Clear retained sim/meta from any previous run before accepting new entities
+        self._client.publish("sim/meta", payload=None, retain=True)
         self._wait_for_entities()
         self._confirm_filters()
         self._client.publish("sim/meta", json.dumps(self._meta), retain=True)

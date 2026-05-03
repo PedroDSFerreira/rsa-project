@@ -15,7 +15,6 @@ def _on_connect(client, userdata, flags, reason_code, properties):
     client.subscribe("sim/announce")
     client.subscribe("sim/links")
     client.subscribe("+/vanetza/own/cam")
-    client.subscribe("vanetza/out/denm")
 
 
 def _on_message(client, userdata, msg):

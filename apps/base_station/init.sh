@@ -13,7 +13,6 @@ export VANETZA_REMOTE_MQTT_BROKER="${MQTT_HOST:-mqtt-central}"
 export VANETZA_REMOTE_MQTT_PORT="${MQTT_PORT:-1883}"
 export VANETZA_LATITUDE="${BASE_STATION_LAT:-40.630}"
 export VANETZA_LONGITUDE="${BASE_STATION_LNG:--8.660}"
-export BASE_STATION_CONTAINER_NAME="base_station"
 
 /entrypoint.sh &
 sleep 5
