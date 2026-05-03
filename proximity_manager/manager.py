@@ -28,10 +28,6 @@ class ProximityManager:
                 "width_m": float(os.getenv("SIM_AREA_WIDTH_M", "1000")),
                 "height_m": float(os.getenv("SIM_AREA_HEIGHT_M", "1000")),
             },
-            "base_station": {
-                "lat": float(os.getenv("BASE_STATION_LAT", "40.630")),
-                "lng": float(os.getenv("BASE_STATION_LNG", "-8.660")),
-            },
             "num_drones": _num_drones,
             "num_sensors": _num_sensors,
         }
