@@ -5,9 +5,6 @@ from dataclasses import dataclass, field
 class EntityInfo:
     station_id: int
     entity_type: str
-    mac: str
-    container_name: str
-    ip: str
     lat: float
     lng: float
 

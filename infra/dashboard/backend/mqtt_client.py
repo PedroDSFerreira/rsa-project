@@ -32,9 +32,6 @@ def _on_message(client, userdata, msg):
         state.entities[sid] = EntityInfo(
             station_id=sid,
             entity_type=payload["entity_type"],
-            mac=payload["mac"],
-            container_name=payload["container_name"],
-            ip=payload["ip"],
             lat=payload["lat"],
             lng=payload["lng"],
         )
