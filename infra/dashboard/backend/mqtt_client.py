@@ -1,6 +1,5 @@
 import json
 import os
-import threading
 
 import paho.mqtt.client as mqtt
 
@@ -60,5 +59,4 @@ def start():
     client.on_connect = _on_connect
     client.on_message = _on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    thread = threading.Thread(target=client.loop_forever, daemon=True)
-    thread.start()
+    client.loop_start()
