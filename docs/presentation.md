@@ -84,7 +84,8 @@ flowchart LR
 <!-- pause -->
 
 - Peers avoid re-visiting already **claimed/visited** cells
-- On first contact between two drones → full **grid sync** (subCauseCode=3)
+- Cell index carried in `actionId.sequenceNumber`
+- On first contact between two drones → full **grid sync** via `sim/grid_sync/{id}` (MQTT)
 
 <!-- end_slide -->
 
@@ -137,7 +138,7 @@ make up
 - **Drone movement** — position is currently static; boustrophedon path not yet implemented
 - **Coverage grid** — cell state tracking (UNKNOWN / CLAIMED / VISITED / SENSOR_FOUND)
 - **Sensor collection flow** — drone detecting sensor in range and requesting data
-- **Multi-drone coordination** — DENM-based grid sync between peers
+- **Multi-drone coordination** — DENM cell events + MQTT grid sync between peers
 - **Mission completion** — base station aggregating all data and uploading to cloud
 - **Dashboard grid overlay** — rendering cell states on the map
 
