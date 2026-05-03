@@ -11,8 +11,8 @@ SENSOR_LNG = float(os.environ["VANETZA_LONGITUDE"])
 SENSOR_MAC = os.environ["VANETZA_MAC_ADDRESS"]
 CONTAINER_NAME = os.environ["SENSOR_CONTAINER_NAME"]
 
-MQTT_CENTRAL_HOST = os.getenv("MQTT_CENTRAL_HOST", "mqtt-central")
-MQTT_CENTRAL_PORT = int(os.getenv("MQTT_CENTRAL_PORT", "1883"))
+MQTT_CENTRAL_HOST = os.getenv("MQTT_HOST", "mqtt-central")
+MQTT_CENTRAL_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 
 def _own_ip() -> str:
