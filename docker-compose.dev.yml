@@ -3,7 +3,7 @@ services:
     image: eclipse-mosquitto:2
     hostname: mqtt-central
     ports:
-      - "1884:1883"
+      - "${MQTT_EXTERNAL_PORT:-1884}:1883"
     volumes:
       - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
     networks:
@@ -18,13 +18,13 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      - MQTT_CENTRAL_HOST=mqtt-central
-      - MQTT_CENTRAL_PORT=1883
-      - MAP_ORIGIN_LAT=40.630
-      - MAP_ORIGIN_LNG=-8.660
-      - MAP_WIDTH_M=1000
-      - MAP_HEIGHT_M=1000
-      - RANDOM_SEED=42
+      - MQTT_HOST=${MQTT_HOST:-mqtt-central}
+      - MQTT_PORT=${MQTT_PORT:-1883}
+      - SIM_AREA_SW_LAT=${SIM_AREA_SW_LAT:-40.630}
+      - SIM_AREA_SW_LNG=${SIM_AREA_SW_LNG:--8.660}
+      - SIM_AREA_WIDTH_M=${SIM_AREA_WIDTH_M:-1000}
+      - SIM_AREA_HEIGHT_M=${SIM_AREA_HEIGHT_M:-1000}
+      - SIM_RANDOM_SEED=${SIM_RANDOM_SEED:-42}
       - PYTHONUNBUFFERED=1
     networks:
       - vanetzalan0
@@ -40,10 +40,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - PYTHONUNBUFFERED=1
-      - MQTT_HOST=mqtt-central
-      - MQTT_PORT=1883
+      - MQTT_HOST=${MQTT_HOST:-mqtt-central}
+      - MQTT_PORT=${MQTT_PORT:-1883}
       - NUM_SENSORS=${NUM_SENSORS:-2}
       - NUM_DRONES=${NUM_DRONES:-0}
+      - SIM_AREA_SW_LAT=${SIM_AREA_SW_LAT:-40.630}
+      - SIM_AREA_SW_LNG=${SIM_AREA_SW_LNG:--8.660}
+      - SIM_AREA_WIDTH_M=${SIM_AREA_WIDTH_M:-1000}
+      - SIM_AREA_HEIGHT_M=${SIM_AREA_HEIGHT_M:-1000}
+      - BASE_STATION_LAT=${BASE_STATION_LAT:-40.630}
+      - BASE_STATION_LNG=${BASE_STATION_LNG:--8.660}
     networks:
       - vanetzalan0
 
@@ -52,10 +58,10 @@ services:
     depends_on:
       - mqtt-central
     environment:
-      - MQTT_HOST=mqtt-central
-      - MQTT_PORT=1883
+      - MQTT_HOST=${MQTT_HOST:-mqtt-central}
+      - MQTT_PORT=${MQTT_PORT:-1883}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     networks:
       - vanetzalan0
 
@@ -64,7 +70,7 @@ services:
     depends_on:
       - dashboard-backend
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
     networks:
       - vanetzalan0
 
