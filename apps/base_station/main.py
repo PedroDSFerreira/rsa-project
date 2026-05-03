@@ -20,37 +20,41 @@ def _own_ip() -> str:
         return s.getsockname()[0]
 
 
-def _announce(ip: str):
-    c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="base-station-announce")
-    c.connect(MQTT_CENTRAL_HOST, MQTT_CENTRAL_PORT)
-    c.publish("sim/announce", json.dumps({
-        "station_id":     STATION_ID,
-        "mac":            MAC,
-        "container_name": CONTAINER_NAME,
-        "ip":             ip,
-        "lat":            LAT,
-        "lng":            LNG,
-        "entity_type":    "base_station",
-    }))
-    c.disconnect()
+class BaseStationAgent:
+    def __init__(self, ip: str):
+        self._ip = ip
+        self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="base-station")
+        self._client.on_connect = self._on_connect
+        self._client.on_message = self._on_message
+
+    def _on_connect(self, client, userdata, flags, reason_code, properties):
+        print(f"Base station connected: {reason_code}", flush=True)
+        client.subscribe("sim/base/data_delivery")
+
+    def _on_message(self, client, userdata, msg):
+        payload = json.loads(msg.payload)
+        print(f"Received data delivery: {json.dumps(payload)}", flush=True)
+
+    def announce(self):
+        c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="base-station-announce")
+        c.connect(MQTT_CENTRAL_HOST, MQTT_CENTRAL_PORT)
+        c.publish("sim/announce", json.dumps({
+            "station_id":     STATION_ID,
+            "mac":            MAC,
+            "container_name": CONTAINER_NAME,
+            "ip":             self._ip,
+            "lat":            LAT,
+            "lng":            LNG,
+            "entity_type":    "base_station",
+        }))
+        c.disconnect()
+        print(f"Base station announced at {self._ip} ({LAT}, {LNG})", flush=True)
+
+    def run(self):
+        self.announce()
+        self._client.connect("127.0.0.1", 1883)
+        self._client.loop_forever()
 
 
-def _on_connect(client, userdata, flags, reason_code, properties):
-    print(f"Base station connected: {reason_code}", flush=True)
-    client.subscribe("sim/base/data_delivery")
-
-
-def _on_message(client, userdata, msg):
-    payload = json.loads(msg.payload)
-    print(f"Received data delivery: {json.dumps(payload)}", flush=True)
-
-
-ip = _own_ip()
-_announce(ip)
-print(f"Base station announced at {ip} ({LAT}, {LNG})", flush=True)
-
-client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="base-station")
-client.on_connect = _on_connect
-client.on_message = _on_message
-client.connect("127.0.0.1", 1883)
-client.loop_forever()
+if __name__ == "__main__":
+    BaseStationAgent(ip=_own_ip()).run()
