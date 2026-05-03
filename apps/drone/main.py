@@ -74,7 +74,7 @@ class DroneAgent:
         print(f"Drone {DRONE_ID} received DENM: {json.dumps(payload)}", flush=True)
 
     def _announce(self, ip: str):
-        self._central.publish("sim/announce", json.dumps({
+        self._central.publish(f"sim/entity/{DRONE_ID}", json.dumps({
             "station_id":     DRONE_ID,
             "mac":            DRONE_MAC,
             "container_name": CONTAINER_NAME,
@@ -82,7 +82,7 @@ class DroneAgent:
             "lat":            self._lat,
             "lng":            self._lng,
             "entity_type":    "drone",
-        }))
+        }), retain=True)
 
     def run(self):
         self._central.connect(MQTT_CENTRAL_HOST, MQTT_CENTRAL_PORT)
