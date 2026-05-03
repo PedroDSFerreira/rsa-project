@@ -1,11 +1,6 @@
 #!/bin/sh
 set -e
 
-CONTAINER_ID=$(cat /etc/hostname)
-CONTAINER_NAME=$(curl -sf --unix-socket /var/run/docker.sock \
-    "http://localhost/containers/${CONTAINER_ID}/json" \
-    | python3 -c "import sys,json; print(json.load(sys.stdin)['Name'].lstrip('/'))")
-
 export VANETZA_STATION_ID=1
 export VANETZA_STATION_TYPE=15
 export VANETZA_MAC_ADDRESS="6e:06:e0:03:03:01"
@@ -18,7 +13,7 @@ export VANETZA_REMOTE_MQTT_BROKER="${MQTT_HOST:-mqtt-central}"
 export VANETZA_REMOTE_MQTT_PORT="${MQTT_PORT:-1883}"
 export VANETZA_LATITUDE="${BASE_STATION_LAT:-40.630}"
 export VANETZA_LONGITUDE="${BASE_STATION_LNG:--8.660}"
-export BASE_STATION_CONTAINER_NAME="$CONTAINER_NAME"
+export BASE_STATION_CONTAINER_NAME="base_station"
 
 /entrypoint.sh &
 sleep 5

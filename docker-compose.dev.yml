@@ -15,8 +15,6 @@ services:
       - mqtt-central
     cap_add:
       - NET_ADMIN
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - MQTT_HOST=${MQTT_HOST:-mqtt-central}
       - MQTT_PORT=${MQTT_PORT:-1883}
