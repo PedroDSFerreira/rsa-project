@@ -1,5 +1,5 @@
-from domain.entity import Entity
-from infra.mac_filter import block, unblock
+from entity import Entity
+from mac_filter import block, unblock
 
 
 class ConnectivityMatrix:
@@ -8,9 +8,6 @@ class ConnectivityMatrix:
 
     def _key(self, a: str, b: str) -> tuple[str, str]:
         return (min(a, b), max(a, b))
-
-    def is_connected(self, a: str, b: str) -> bool:
-        return self._state.get(self._key(a, b), False)
 
     def update(self, a: Entity, b: Entity, should_connect: bool):
         key = self._key(a.container_name, b.container_name)
