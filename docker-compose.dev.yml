@@ -49,8 +49,6 @@ services:
     build: ./apps/sensor
     depends_on:
       - mqtt-central
-    cap_add:
-      - NET_ADMIN
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
