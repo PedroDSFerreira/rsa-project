@@ -131,12 +131,11 @@ class ProximityManager:
     def run(self):
         self._client.connect(MQTT_HOST, MQTT_PORT)
         self._client.loop_start()
-        # Clear retained sim/meta from any previous run before accepting new entities
-        self._client.publish("sim/meta", payload=None, retain=True)
-        self._wait_for_entities()
-        self._confirm_filters()
+        # Publish sim/meta immediately (static config known at startup)
         self._client.publish("sim/meta", json.dumps(self._meta), retain=True)
         print("Published sim/meta", flush=True)
+        self._wait_for_entities()
+        self._confirm_filters()
         while True:
             start = time.monotonic()
             self._do_tick()

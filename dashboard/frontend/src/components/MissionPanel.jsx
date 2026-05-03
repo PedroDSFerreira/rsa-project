@@ -37,11 +37,12 @@ export default function MissionPanel() {
         {entityList.length === 0 && <div style={{ fontSize: '12px', color: '#888' }}>Waiting for announcements…</div>}
         {entityList.map((e) => {
           const idx = e.container_name?.match(/-([0-9]+)$/)?.[1] ?? e.station_id
+          const label = e.entity_type === 'base_station' ? 'base station' : `${e.entity_type} #${idx}`
           return (
             <div key={e.station_id} style={{ ...ROW, alignItems: 'center' }}>
               <span style={{ fontSize: '12px' }}>
                 <span style={{ color: e.entity_type === 'drone' ? '#4fc3f7' : '#81c784' }}>● </span>
-                {e.entity_type} #{idx}
+                {label}
               </span>
               <span style={{ fontSize: '11px', color: '#aaa' }}>{e.lat.toFixed(4)}</span>
             </div>

@@ -75,10 +75,11 @@ export default function MapView() {
       />
       {entityList.map((e) => {
         const idx = e.container_name?.match(/-([0-9]+)$/)?.[1] ?? e.station_id
+        const label = e.entity_type === 'base_station' ? 'base station' : `${e.entity_type} #${idx}`
         return (
           <Marker key={e.station_id} position={[e.lat, e.lng]} icon={entityIcon(e.entity_type)}>
             <Popup>
-              <strong>{e.entity_type} #{idx}</strong><br />
+              <strong>{label}</strong><br />
               {e.lat.toFixed(5)}, {e.lng.toFixed(5)}<br />
               <small style={{color:'#888'}}>id: {e.station_id}</small>
             </Popup>

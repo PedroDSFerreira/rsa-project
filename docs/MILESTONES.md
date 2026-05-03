@@ -34,7 +34,7 @@ docker exec node-b mosquitto_pub -t "vanetza/in/cam" -f /examples/in_cam.json
 ### Tasks
 - [x] Create `proximity_manager/` with `Dockerfile`, `requirements.txt` (`paho-mqtt`, `docker`)
 - [x] Implement `proximity.py`: connectivity matrix, `block(container, mac)` / `unblock(container, mac)` via Docker SDK
-- [x] Implement `main.py`: read `simulation_config.yaml`, subscribe to `mqtt-central` `vanetza/out/cam` for drone positions, compute haversine distances each tick, call `proximity.py`
+- [x] Implement `main.py`: read config from env vars, subscribe to `mqtt-central` `vanetza/out/cam` for drone positions, compute haversine distances each tick, call `proximity.py`
 - [x] Publish `sim/meta` (retained) to `mqtt-central` on startup: `{ "map": {...}, "num_drones": N, "num_sensors": M }`
 - [x] Publish `sim/links` each tick: `{ "connected": [[id_a, id_b], ...], "tick": N }`
 - [x] Start all containers with all MACs fully blocked (isolated by default)
@@ -158,7 +158,7 @@ docker compose up
 
 ### Tasks
 - [ ] Base station app (`apps/base_station/main.py`):
-  - At mission start, compute equal horizontal strip for each drone based on `simulation_config.yaml`
+  - At mission start, compute equal horizontal strip for each drone based on `CELL_SIZE_M`, `NUM_DRONES`, `SIM_AREA_*` env vars
   - Publish strip assignment to each drone via `sim/drone/{id}/mission` on `mqtt-central`
 - [ ] Drone app: subscribe `sim/drone/{id}/mission` on startup, wait for strip assignment before starting `EXPLORING`
 - [ ] Drone app: on receiving DENM from another drone:
@@ -245,14 +245,14 @@ docker-compose -f docker-compose.sim.yml -f docker-compose.infra.yml up
 **Goal:** One command runs the entire simulation. Entity counts and map parameters are the single source of truth. Runs are reproducible.
 
 ### Tasks
-- [ ] Add `random_seed` to `simulation_config.yaml`; sensor `entrypoint.sh` uses it so the same seed always produces the same positions
-- [ ] Update `docker-compose.yml` `deploy.replicas` values to match `num_drones`/`num_sensors` in config (these two files are the only things to edit when scaling)
+- [x] `SIM_RANDOM_SEED` in `.env`; sensor `init.sh` uses it so the same seed always produces the same positions
+- [x] `NUM_SENSORS`/`NUM_DRONES` in `.env` are the single source of truth; `deploy.replicas` reads them — `.env` is the only file to edit when scaling
 - [ ] Add `Makefile` with convenience targets:
   - `make up` — `docker compose up`
   - `make down` — tear down all containers
   - `make logs` — tail all app logs
   - `make clean` — remove dangling volumes and images
-- [ ] Parameterize all hardcoded values via environment variables with documented defaults
+- [x] All values parameterized via environment variables in `.env` / `.env-sample` with documented defaults
 - [ ] Write `README.md` quickstart: install Docker, set replica counts, `make up`, open dashboard
 
 ### Acceptance Test
