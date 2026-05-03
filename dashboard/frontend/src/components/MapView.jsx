@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Rectangle } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { useSim } from '../context/SimContext'
@@ -20,12 +20,39 @@ function entityIcon(type) {
   return L.divIcon({ html: svg, className: '', iconSize: [24, 24], iconAnchor: [12, 12] })
 }
 
+const DEFAULT_SW_LAT = 40.630
+const DEFAULT_SW_LNG = -8.660
+const DEFAULT_WIDTH_M = 1000
+const DEFAULT_HEIGHT_M = 1000
+
+function simAreaBounds(meta) {
+  const s = meta?.sim_area ?? meta?.map
+  const swLat = s?.sw_lat ?? DEFAULT_SW_LAT
+  const swLng = s?.sw_lng ?? DEFAULT_SW_LNG
+  const widthM = s?.width_m ?? DEFAULT_WIDTH_M
+  const heightM = s?.height_m ?? DEFAULT_HEIGHT_M
+  const neLat = swLat + heightM / 111000
+  const neLng = swLng + widthM / (111000 * Math.cos(swLat * Math.PI / 180))
+  return [[swLat, swLng], [neLat, neLng]]
+}
+
+function simAreaCenter(meta) {
+  const s = meta?.sim_area ?? meta?.map
+  const swLat = s?.sw_lat ?? DEFAULT_SW_LAT
+  const swLng = s?.sw_lng ?? DEFAULT_SW_LNG
+  const widthM = s?.width_m ?? DEFAULT_WIDTH_M
+  const heightM = s?.height_m ?? DEFAULT_HEIGHT_M
+  return [
+    swLat + (heightM / 2) / 111000,
+    swLng + (widthM / 2) / (111000 * Math.cos(swLat * Math.PI / 180)),
+  ]
+}
+
 export default function MapView() {
   const { meta, entities, links } = useSim()
 
-  const origin = meta?.map
-    ? [meta.map.origin_lat, meta.map.origin_lng]
-    : [40.630, -8.660]
+  const center = simAreaCenter(meta)
+  const areaBounds = simAreaBounds(meta)
 
   const entityList = Object.values(entities)
 
@@ -41,10 +68,14 @@ export default function MapView() {
   }).filter(Boolean)
 
   return (
-    <MapContainer center={origin} zoom={15} style={{ flex: 1, height: '100%' }}>
+    <MapContainer center={center} zoom={15} style={{ flex: 1, height: '100%' }}>
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution="© OpenStreetMap contributors"
+      />
+      <Rectangle
+        bounds={areaBounds}
+        pathOptions={{ color: '#42a5f5', weight: 3, fillColor: '#90caf9', fillOpacity: 0.15, dashArray: '10 6' }}
       />
       {baseStation && (
         <Marker position={baseStation} icon={entityIcon('base_station')}>
