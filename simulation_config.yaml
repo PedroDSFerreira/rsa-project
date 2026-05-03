@@ -1,8 +1,4 @@
 map:
-  width_m: 1000
-  height_m: 1000
-  origin_lat: 40.630
-  origin_lng: -8.660
   cell_size_m: 50
 
 radio:
@@ -12,8 +8,3 @@ radio:
 simulation:
   tick_real_ms: 500
   drone_speed_m_s: 5.0
-  random_seed: 42
-
-base_station:
-  lat: 40.630
-  lng: -8.660

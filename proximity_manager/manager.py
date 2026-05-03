@@ -22,8 +22,16 @@ class ProximityManager:
         _num_sensors = int(os.getenv("NUM_SENSORS", "2"))
         self._expected: int = _num_drones + _num_sensors
         self._meta = {
-            "map": config["map"],
-            "base_station": config["base_station"],
+            "sim_area": {
+                "sw_lat": float(os.getenv("SIM_AREA_SW_LAT", "40.630")),
+                "sw_lng": float(os.getenv("SIM_AREA_SW_LNG", "-8.660")),
+                "width_m": float(os.getenv("SIM_AREA_WIDTH_M", "1000")),
+                "height_m": float(os.getenv("SIM_AREA_HEIGHT_M", "1000")),
+            },
+            "base_station": {
+                "lat": float(os.getenv("BASE_STATION_LAT", "40.630")),
+                "lng": float(os.getenv("BASE_STATION_LNG", "-8.660")),
+            },
             "num_drones": _num_drones,
             "num_sensors": _num_sensors,
         }
@@ -126,6 +134,9 @@ class ProximityManager:
     def run(self):
         self._client.connect(MQTT_HOST, MQTT_PORT)
         self._client.loop_start()
+        # Clear retained messages from any previous run before accepting new entities
+        for topic in ("sim/meta", "sim/links"):
+            self._client.publish(topic, payload=None, retain=True)
         self._wait_for_entities()
         self._confirm_filters()
         self._client.publish("sim/meta", json.dumps(self._meta), retain=True)
