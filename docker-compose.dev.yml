@@ -16,9 +16,6 @@ services:
 
   base_station:
     build: ./apps/base_station
-    depends_on:
-      proximity-manager:
-        condition: service_started
     cap_add:
       - NET_ADMIN
     environment:
@@ -32,9 +29,6 @@ services:
 
   drone:
     build: ./apps/drone
-    depends_on:
-      proximity-manager:
-        condition: service_started
     cap_add:
       - NET_ADMIN
     volumes:
@@ -54,9 +48,6 @@ services:
 
   sensor:
     build: ./apps/sensor
-    depends_on:
-      proximity-manager:
-        condition: service_started
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
