@@ -1,5 +1,4 @@
 import json
-import os
 
 import paho.mqtt.client as mqtt
 
@@ -8,8 +7,6 @@ LOCAL_PORT = 1883
 
 
 class VanetzaClient:
-    """Thin wrapper for publishing/subscribing CAM and DENM on the local vanetza broker."""
-
     def __init__(self, client_id: str):
         self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=client_id)
         self._cam_callbacks: list = []

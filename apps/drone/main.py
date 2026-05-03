@@ -40,7 +40,7 @@ class DroneAgent:
         self._lat = DRONE_LAT
         self._lng = DRONE_LNG
         self._heading = 0.0
-        self._entities: dict[int, dict] = {}  # station_id → announce payload
+        self._entities: dict[int, dict] = {}
 
         self._central = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"drone-central-{DRONE_ID}")
         self._central.on_connect = self._on_central_connect
@@ -59,8 +59,7 @@ class DroneAgent:
             payload = json.loads(msg.payload)
         except json.JSONDecodeError:
             return
-        if msg.topic == "sim/announce":
-            self._entities[payload["station_id"]] = payload
+        self._entities[payload["station_id"]] = payload
 
     def _on_cam(self, payload: dict):
         try:
