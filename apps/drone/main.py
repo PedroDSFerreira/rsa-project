@@ -74,7 +74,7 @@ class DroneAgent:
         print(f"Drone {DRONE_ID} received DENM: {json.dumps(payload)}", flush=True)
 
     def _announce(self, ip: str):
-        self._central.publish(f"sim/entity/{DRONE_ID}", json.dumps({
+        self._central.publish("sim/announce", json.dumps({
             "station_id":     DRONE_ID,
             "mac":            DRONE_MAC,
             "container_name": CONTAINER_NAME,
@@ -104,7 +104,6 @@ class DroneAgent:
             time.sleep(max(0, TICK_MS / 1000 - elapsed))
 
     def _tick(self):
-        # Publish CAM with current position
         self._vanetza.publish_cam(self._lat, self._lng, self._heading, DRONE_SPEED)
 
 

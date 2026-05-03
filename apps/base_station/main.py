@@ -23,7 +23,7 @@ def _own_ip() -> str:
 def _announce(ip: str):
     c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="base-station-announce")
     c.connect(MQTT_CENTRAL_HOST, MQTT_CENTRAL_PORT)
-    c.publish(f"sim/entity/{STATION_ID}", json.dumps({
+    c.publish("sim/announce", json.dumps({
         "station_id":     STATION_ID,
         "mac":            MAC,
         "container_name": CONTAINER_NAME,

@@ -41,19 +41,15 @@ class SensorAgent:
             client_id=f"sensor-announce-{self._identity.station_id}",
         )
         c.connect(MQTT_HOST, MQTT_PORT)
-        c.publish(
-            f"sim/entity/{self._identity.station_id}",
-            json.dumps({
-                "station_id":     self._identity.station_id,
-                "mac":            self._identity.mac,
-                "container_name": self._identity.container_name,
-                "ip":             self._ip,
-                "lat":            self._identity.lat,
-                "lng":            self._identity.lng,
-                "entity_type":    "sensor",
-            }),
-            retain=True,
-        )
+        c.publish("sim/announce", json.dumps({
+            "station_id":     self._identity.station_id,
+            "mac":            self._identity.mac,
+            "container_name": self._identity.container_name,
+            "ip":             self._ip,
+            "lat":            self._identity.lat,
+            "lng":            self._identity.lng,
+            "entity_type":    "sensor",
+        }), retain=True)
         c.disconnect()
         print(
             f"Sensor {self._identity.station_id} announced at"
