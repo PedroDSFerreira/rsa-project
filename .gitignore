@@ -1,5 +1,5 @@
 docs/
 scripts/
 .env
-dashboard/frontend/node_modules/
-dashboard/frontend/dist/
+infra/dashboard/frontend/node_modules/
+infra/dashboard/frontend/dist/

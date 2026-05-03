@@ -66,7 +66,7 @@ services:
       replicas: ${NUM_SENSORS:-2}
 
   proximity-manager:
-    build: ./proximity_manager
+    build: ./infra/proximity_manager
     depends_on:
       - mqtt-central
     volumes:
@@ -88,7 +88,7 @@ services:
       - vanetzalan0
 
   dashboard-backend:
-    build: ./dashboard/backend
+    build: ./infra/dashboard/backend
     depends_on:
       - mqtt-central
     environment:
@@ -100,7 +100,7 @@ services:
       - vanetzalan0
 
   dashboard-frontend:
-    build: ./dashboard/frontend
+    build: ./infra/dashboard/frontend
     depends_on:
       - dashboard-backend
     ports:
