@@ -35,13 +35,10 @@ class SensorAgent:
         self._client.on_connect = self._on_connect
         self._client.on_message = self._on_message
 
-    def announce(self):
-        c = mqtt.Client(
-            mqtt.CallbackAPIVersion.VERSION2,
-            client_id=f"sensor-announce-{self._identity.station_id}",
-        )
-        c.connect(MQTT_HOST, MQTT_PORT)
-        c.publish("sim/announce", json.dumps({
+    def _on_connect(self, client, userdata, flags, reason_code, properties):
+        print(f"Sensor {self._identity.station_id} connected: {reason_code}", flush=True)
+        client.subscribe("sensor/request_data")
+        client.publish("sim/announce", json.dumps({
             "station_id":     self._identity.station_id,
             "mac":            self._identity.mac,
             "container_name": self._identity.container_name,
@@ -50,21 +47,16 @@ class SensorAgent:
             "lng":            self._identity.lng,
             "entity_type":    "sensor",
         }))
-        c.disconnect()
         print(
             f"Sensor {self._identity.station_id} announced at"
             f" {self._ip} ({self._identity.lat}, {self._identity.lng})",
             flush=True,
         )
 
-    def run(self):
-        self._client.connect(MQTT_HOST, MQTT_PORT)
-        self._client.loop_forever()
-
-    def _on_connect(self, client, userdata, flags, reason_code, properties):
-        print(f"Sensor {self._identity.station_id} connected: {reason_code}", flush=True)
-        client.subscribe("sensor/request_data")
-
     def _on_message(self, client, userdata, msg):
         self._client.publish("sensor/data_response", json.dumps(self._reading))
         print(f"Sensor {self._identity.station_id} responded to request", flush=True)
+
+    def run(self):
+        self._client.connect(MQTT_HOST, MQTT_PORT)
+        self._client.loop_forever()

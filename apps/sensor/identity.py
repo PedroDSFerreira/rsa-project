@@ -32,7 +32,8 @@ def own_ip() -> str:
 
 
 def _container_name() -> str:
-    container_id = open("/etc/hostname").read().strip()
+    with open("/etc/hostname") as f:
+        container_id = f.read().strip()
     conn = _UnixHTTPConnection()
     conn.request("GET", f"/containers/{container_id}/json")
     data = json.loads(conn.getresponse().read())
