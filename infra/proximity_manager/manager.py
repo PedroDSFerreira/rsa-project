@@ -41,7 +41,7 @@ class ProximityManager:
 
     def _on_connect(self, client, userdata, flags, reason_code, properties):
         print(f"Connected to mqtt-central: {reason_code}", flush=True)
-        client.subscribe("sim/announce")
+        client.subscribe("sim/announce/+")
         client.subscribe("+/vanetza/own/cam")
 
     def _on_message(self, client, userdata, msg):
@@ -49,7 +49,7 @@ class ProximityManager:
             payload = json.loads(msg.payload)
         except json.JSONDecodeError:
             return
-        if msg.topic == "sim/announce":
+        if msg.topic.startswith("sim/announce/"):
             self._handle_announce(payload)
         else:
             self._handle_cam(payload)

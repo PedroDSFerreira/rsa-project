@@ -11,7 +11,7 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 def _on_connect(client, userdata, flags, reason_code, properties):
     client.subscribe("sim/meta")
-    client.subscribe("sim/announce")
+    client.subscribe("sim/announce/+")
     client.subscribe("sim/links")
     client.subscribe("+/vanetza/own/cam")
 
@@ -27,7 +27,7 @@ def _on_message(client, userdata, msg):
     if topic == "sim/meta":
         state.meta = payload
 
-    elif topic == "sim/announce":
+    elif topic.startswith("sim/announce/"):
         sid = payload["station_id"]
         state.entities[sid] = EntityInfo(
             station_id=sid,

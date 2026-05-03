@@ -51,7 +51,7 @@ class DroneAgent:
         self._vanetza.on_denm(self._on_denm)
 
     def _on_central_connect(self, client, userdata, flags, reason_code, properties):
-        client.subscribe("sim/announce")
+        client.subscribe("sim/announce/+")
         print(f"Drone {DRONE_ID} connected to mqtt-central: {reason_code}", flush=True)
 
     def _on_central_message(self, client, userdata, msg):
@@ -73,7 +73,7 @@ class DroneAgent:
         print(f"Drone {DRONE_ID} received DENM: {json.dumps(payload)}", flush=True)
 
     def _announce(self, ip: str):
-        self._central.publish("sim/announce", json.dumps({
+        self._central.publish(f"sim/announce/{DRONE_ID}", json.dumps({
             "station_id":     DRONE_ID,
             "mac":            DRONE_MAC,
             "container_name": CONTAINER_NAME,
@@ -81,7 +81,7 @@ class DroneAgent:
             "lat":            self._lat,
             "lng":            self._lng,
             "entity_type":    "drone",
-        }))
+        }), retain=True)
 
     def run(self):
         self._central.connect(MQTT_CENTRAL_HOST, MQTT_CENTRAL_PORT)

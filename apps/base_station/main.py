@@ -38,7 +38,7 @@ class BaseStationAgent:
     def announce(self):
         c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="base-station-announce")
         c.connect(MQTT_CENTRAL_HOST, MQTT_CENTRAL_PORT)
-        c.publish("sim/announce", json.dumps({
+        c.publish(f"sim/announce/{STATION_ID}", json.dumps({
             "station_id":     STATION_ID,
             "mac":            MAC,
             "container_name": CONTAINER_NAME,
@@ -46,7 +46,7 @@ class BaseStationAgent:
             "lat":            LAT,
             "lng":            LNG,
             "entity_type":    "base_station",
-        }))
+        }), retain=True)
         c.disconnect()
         print(f"Base station announced at {self._ip} ({LAT}, {LNG})", flush=True)
 

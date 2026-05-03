@@ -38,7 +38,7 @@ class SensorAgent:
     def _on_connect(self, client, userdata, flags, reason_code, properties):
         print(f"Sensor {self._identity.station_id} connected: {reason_code}", flush=True)
         client.subscribe("sensor/request_data")
-        client.publish("sim/announce", json.dumps({
+        client.publish(f"sim/announce/{self._identity.station_id}", json.dumps({
             "station_id":     self._identity.station_id,
             "mac":            self._identity.mac,
             "container_name": self._identity.container_name,
@@ -46,7 +46,7 @@ class SensorAgent:
             "lat":            self._identity.lat,
             "lng":            self._identity.lng,
             "entity_type":    "sensor",
-        }))
+        }), retain=True)
         print(
             f"Sensor {self._identity.station_id} announced at"
             f" {self._ip} ({self._identity.lat}, {self._identity.lng})",
