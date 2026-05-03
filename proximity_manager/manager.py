@@ -20,7 +20,7 @@ class ProximityManager:
         self._tick_ms: int = config["simulation"]["tick_real_ms"]
         _num_drones = int(os.getenv("NUM_DRONES", "0"))
         _num_sensors = int(os.getenv("NUM_SENSORS", "2"))
-        self._expected: int = _num_drones + _num_sensors
+        self._expected: int = _num_drones + _num_sensors + 1  # +1 for base station
         self._meta = {
             "sim_area": {
                 "sw_lat": float(os.getenv("SIM_AREA_SW_LAT", "40.630")),

@@ -56,10 +56,6 @@ export default function MapView() {
 
   const entityList = Object.values(entities)
 
-  const baseStation = meta?.base_station
-    ? [meta.base_station.lat, meta.base_station.lng]
-    : null
-
   const linkLines = links.map(([idA, idB]) => {
     const a = entities[idA]
     const b = entities[idB]
@@ -77,14 +73,6 @@ export default function MapView() {
         bounds={areaBounds}
         pathOptions={{ color: '#42a5f5', weight: 3, fillColor: '#90caf9', fillOpacity: 0.15, dashArray: '10 6' }}
       />
-      {baseStation && (
-        <Marker position={baseStation} icon={entityIcon('base_station')}>
-          <Popup>
-            <strong>base station</strong><br />
-            {baseStation[0].toFixed(5)}, {baseStation[1].toFixed(5)}
-          </Popup>
-        </Marker>
-      )}
       {entityList.map((e) => {
         const idx = e.container_name?.match(/-([0-9]+)$/)?.[1] ?? e.station_id
         return (
