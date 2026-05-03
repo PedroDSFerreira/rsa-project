@@ -24,6 +24,27 @@ services:
     networks:
       - vanetzalan0
 
+  drone:
+    build: ./apps/drone
+    depends_on:
+      - mqtt-central
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - MQTT_HOST=${MQTT_HOST:-mqtt-central}
+      - MQTT_PORT=${MQTT_PORT:-1883}
+      - BASE_STATION_LAT=${BASE_STATION_LAT:-40.633}
+      - BASE_STATION_LNG=${BASE_STATION_LNG:--8.662}
+      - TICK_REAL_MS=${TICK_REAL_MS:-500}
+      - DRONE_SPEED_M_S=${DRONE_SPEED_M_S:-5.0}
+      - PYTHONUNBUFFERED=1
+    networks:
+      - vanetzalan0
+    deploy:
+      replicas: ${NUM_DRONES:-0}
+
   sensor:
     build: ./apps/sensor
     depends_on:

@@ -63,6 +63,7 @@ class ProximityManager:
             payload["mac"],
             payload["lat"],
             payload["lng"],
+            payload["entity_type"],
         )
         print(
             f"Announced: stationId={station_id} container={payload['container_name']}"
@@ -92,7 +93,7 @@ class ProximityManager:
                 b = self._entities[ids[j]]
                 dist = haversine(a.lat, a.lng, b.lat, b.lng)
                 in_range = dist <= self._range_between(a, b)
-                self._matrix.update(a.container_name, b.container_name, a.mac, b.mac, in_range)
+                self._matrix.update(a, b, in_range)
                 if in_range:
                     connected.append([a.station_id, b.station_id])
         self._client.publish("sim/links", json.dumps({"connected": connected, "tick": self._tick}))
@@ -104,8 +105,9 @@ class ProximityManager:
             for j in range(i + 1, len(ids)):
                 a = self._entities[ids[i]]
                 b = self._entities[ids[j]]
-                block(a.container_name, b.mac)
-                block(b.container_name, a.mac)
+                if a.has_vanetza and b.has_vanetza:
+                    block(a.container_name, b.mac)
+                    block(b.container_name, a.mac)
                 self._matrix.seed_blocked(a.container_name, b.container_name)
         print(f"Blocked {len(ids)*(len(ids)-1)//2} pairs", flush=True)
 
@@ -117,12 +119,12 @@ class ProximityManager:
 
     def _confirm_filters(self):
         deadline = time.monotonic() + 30
-        ids = list(self._entities.keys())
+        vanetza = [e for e in self._entities.values() if e.has_vanetza]
+        if len(vanetza) < 2:
+            return
         while time.monotonic() < deadline:
             self._block_all()
-            if len(ids) < 2:
-                break
-            a, b = self._entities[ids[0]], self._entities[ids[1]]
+            a, b = vanetza[0], vanetza[1]
             if filter_present(a.container_name, b.mac):
                 break
             print("Filter not confirmed — retrying in 1s...", flush=True)
