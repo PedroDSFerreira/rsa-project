@@ -94,7 +94,7 @@ class ProximityManager:
                 dist = haversine(a.lat, a.lng, b.lat, b.lng)
                 in_range = dist <= self._range_between(a, b)
                 self._matrix.update(a, b, in_range)
-                if in_range:
+                if in_range and not (a.entity_type == "sensor" and b.entity_type == "sensor"):
                     connected.append([a.station_id, b.station_id])
         self._client.publish("sim/links", json.dumps({"connected": connected, "tick": self._tick}))
         self._tick += 1
