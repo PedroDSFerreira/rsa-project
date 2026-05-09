@@ -15,7 +15,9 @@ def _on_connect(client, userdata, flags, reason_code, properties):
     client.subscribe("sim/meta")
     client.subscribe("sim/announce/+")
     client.subscribe("sim/links")
+    client.subscribe("sim/start")
     client.subscribe("+/vanetza/own/cam")
+    client.subscribe("+/vanetza/out/denm")
 
 
 def _on_message(client, userdata, msg):
@@ -43,6 +45,11 @@ def _on_message(client, userdata, msg):
         state.links = payload.get("connected", [])
         state.tick = payload.get("tick", state.tick)
 
+    elif topic == "sim/start":
+        m = payload.get("map", {})
+        if m:
+            state.grid_map = m
+
     elif "/vanetza/own/cam" in topic:
         try:
             sid = payload["stationID"]
@@ -51,6 +58,17 @@ def _on_message(client, userdata, msg):
                 state.entities[sid].lat = pos["latitude"]
                 state.entities[sid].lng = pos["longitude"]
         except KeyError:
+            pass
+
+    elif "/vanetza/out/denm" in topic:
+        try:
+            mgmt = payload["fields"]["denm"]["management"]
+            cell_index = mgmt["actionId"]["sequenceNumber"]
+            sub_cause = payload["fields"]["denm"]["situation"]["eventType"]["subCauseCode"]
+            new_state = sub_cause + 1  # 0→1(CLAIMED), 1→2(VISITED), 2→3(SENSOR_FOUND)
+            if new_state > state.grid_cells.get(cell_index, 0):
+                state.grid_cells[cell_index] = new_state
+        except (KeyError, TypeError):
             pass
 
 

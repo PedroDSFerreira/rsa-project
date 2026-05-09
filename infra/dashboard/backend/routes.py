@@ -13,6 +13,8 @@ def _serialise():
         "meta": state.meta,
         "entities": {sid: dataclasses.asdict(e) for sid, e in state.entities.items()},
         "links": state.links,
+        "grid_map": state.grid_map,
+        "grid_cells": state.grid_cells,
         "tick": state.tick,
     }
 
