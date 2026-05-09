@@ -184,7 +184,7 @@ class DroneAgent:
         if self._grid is None:
             return
         try:
-            denm = payload["fields"]["denm"]
+            denm = payload.get("fields", {}).get("denm") or payload
             mgmt = denm["management"]
             originator = mgmt["actionId"]["originatingStationId"]
             if originator == DRONE_ID:
@@ -290,12 +290,13 @@ class DroneAgent:
             self._waypoint = nxt
             self._waypoint_pos = self._grid.cell_to_coords(*nxt)
             self._grid.set(*nxt, CellState.CLAIMED)
+            cell_idx = self._grid.cell_index(*nxt)
             cell_lat, cell_lng = self._waypoint_pos
             validity = max(10, int(self._cell_size_m / DRONE_SPEED * 4))
             self._vanetza.publish_denm(
                 cell_lat, cell_lng,
                 sub_cause_code=0,
-                cell_index=self._grid.cell_index(*nxt),
+                cell_index=cell_idx,
                 station_id=DRONE_ID,
                 validity_duration=validity,
             )
@@ -308,10 +309,11 @@ class DroneAgent:
             self._lat, self._lng = target_lat, target_lng
             row, col = self._waypoint
             self._grid.set(row, col, CellState.VISITED)
+            cell_idx = self._grid.cell_index(row, col)
             self._vanetza.publish_denm(
                 target_lat, target_lng,
                 sub_cause_code=1,
-                cell_index=self._grid.cell_index(row, col),
+                cell_index=cell_idx,
                 station_id=DRONE_ID,
             )
             print(f"Drone {DRONE_ID} visited ({row},{col})", flush=True)
@@ -370,10 +372,11 @@ class DroneAgent:
         slat, slng = sensor["lat"], sensor["lng"]
         row, col = self._grid.coords_to_cell(slat, slng)
         self._grid.set(row, col, CellState.SENSOR_FOUND)
+        cell_idx = self._grid.cell_index(row, col)
         self._vanetza.publish_denm(
             slat, slng,
             sub_cause_code=2,
-            cell_index=self._grid.cell_index(row, col),
+            cell_index=cell_idx,
             station_id=DRONE_ID,
         )
         print(f"Drone {DRONE_ID} collected sensor {sensor_id} → {len(self._collected_data)} total", flush=True)

@@ -16,7 +16,8 @@ def _on_connect(client, userdata, flags, reason_code, properties):
     client.subscribe("sim/announce/+")
     client.subscribe("sim/links")
     client.subscribe("sim/start")
-    client.subscribe("+/vanetza/own/cam")
+    client.subscribe("+/vanetza/time/cam")
+    client.subscribe("+/vanetza/time/denm")
     client.subscribe("+/vanetza/out/denm")
 
 
@@ -50,19 +51,32 @@ def _on_message(client, userdata, msg):
         if m:
             state.grid_map = m
 
-    elif "/vanetza/own/cam" in topic:
+    elif "/vanetza/time/cam" in topic:
         try:
-            sid = payload["stationID"]
-            pos = payload["fields"]["cam"]["camParameters"]["basicContainer"]["referencePosition"]
-            if sid in state.entities:
+            sid = payload.get("stationID")
+            cam = payload.get("camParameters") or payload.get("fields", {}).get("cam", {}).get("camParameters", {})
+            pos = cam["basicContainer"]["referencePosition"]
+            if sid and sid in state.entities:
                 state.entities[sid].lat = pos["latitude"]
                 state.entities[sid].lng = pos["longitude"]
-        except KeyError:
+        except (KeyError, TypeError):
+            pass
+
+    elif "/vanetza/time/denm" in topic:
+        try:
+            cell_index = payload["management"]["actionId"]["sequenceNumber"]
+            sub_cause = payload["situation"]["eventType"]["ccAndScc"].get("dangerousSituation97")
+            if sub_cause is None:
+                return
+            new_state = sub_cause + 1
+            if new_state > state.grid_cells.get(cell_index, 0):
+                state.grid_cells[cell_index] = new_state
+        except (KeyError, TypeError):
             pass
 
     elif "/vanetza/out/denm" in topic:
         try:
-            denm = payload["fields"]["denm"]
+            denm = payload.get("fields", {}).get("denm") or payload
             cell_index = denm["management"]["actionId"]["sequenceNumber"]
             sub_cause = denm["situation"]["eventType"]["ccAndScc"].get("dangerousSituation97")
             if sub_cause is None:

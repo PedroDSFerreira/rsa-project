@@ -42,7 +42,7 @@ class ProximityManager:
     def _on_connect(self, client, userdata, flags, reason_code, properties):
         print(f"Connected to mqtt-central: {reason_code}", flush=True)
         client.subscribe("sim/announce/+")
-        client.subscribe("+/vanetza/own/cam")
+        client.subscribe("+/vanetza/time/cam")
 
     def _on_message(self, client, userdata, msg):
         try:
@@ -51,8 +51,19 @@ class ProximityManager:
             return
         if msg.topic.startswith("sim/announce/"):
             self._handle_announce(payload)
-        else:
-            self._handle_cam(payload)
+        elif "/vanetza/time/cam" in msg.topic:
+            self._handle_time_cam(payload)
+
+    def _handle_time_cam(self, payload: dict):
+        try:
+            sid = payload.get("stationID")
+            cam = payload.get("camParameters") or payload.get("fields", {}).get("cam", {}).get("camParameters", {})
+            pos = cam["basicContainer"]["referencePosition"]
+            if sid and sid in self._entities:
+                self._entities[sid].lat = pos["latitude"]
+                self._entities[sid].lng = pos["longitude"]
+        except (KeyError, TypeError):
+            pass
 
     def _handle_announce(self, payload: dict):
         station_id = payload["station_id"]
@@ -71,16 +82,6 @@ class ProximityManager:
             f" type={payload['entity_type']} ({len(self._entities)}/{self._expected})",
             flush=True,
         )
-
-    def _handle_cam(self, payload: dict):
-        try:
-            sid = payload["stationID"]
-            pos = payload["fields"]["cam"]["camParameters"]["basicContainer"]["referencePosition"]
-            if sid in self._entities:
-                self._entities[sid].lat = pos["latitude"]
-                self._entities[sid].lng = pos["longitude"]
-        except KeyError:
-            pass
 
     def _range_between(self, a: Entity, b: Entity) -> float:
         return self._base_range if a.station_id == 1 or b.station_id == 1 else self._drone_range
