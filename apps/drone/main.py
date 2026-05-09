@@ -236,7 +236,10 @@ class DroneAgent:
 
         while True:
             start = time.monotonic()
-            self._tick()
+            try:
+                self._tick()
+            except Exception as e:
+                print(f"Drone {DRONE_ID} tick error: {e}", flush=True)
             elapsed = time.monotonic() - start
             time.sleep(max(0, TICK_MS / 1000 - elapsed))
 
