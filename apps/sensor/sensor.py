@@ -37,7 +37,7 @@ class SensorAgent:
 
     def _on_connect(self, client, userdata, flags, reason_code, properties):
         print(f"Sensor {self._identity.station_id} connected: {reason_code}", flush=True)
-        client.subscribe("sensor/request_data")
+        client.subscribe(f"sensor/{self._identity.station_id}/request")
         client.publish(f"sim/announce/{self._identity.station_id}", json.dumps({
             "station_id":     self._identity.station_id,
             "mac":            self._identity.mac,
@@ -54,9 +54,19 @@ class SensorAgent:
         )
 
     def _on_message(self, client, userdata, msg):
-        self._client.publish("sensor/data_response", json.dumps(self._reading))
-        print(f"Sensor {self._identity.station_id} responded to request", flush=True)
+        try:
+            requester_id = json.loads(msg.payload)["requester_id"]
+        except (json.JSONDecodeError, KeyError):
+            return
+        self._client.publish(f"sensor/{self._identity.station_id}/response/{requester_id}", json.dumps(self._reading))
+        print(f"Sensor {self._identity.station_id} responded to drone {requester_id}", flush=True)
 
     def run(self):
-        self._client.connect(MQTT_HOST, MQTT_PORT)
+        while True:
+            try:
+                self._client.connect(MQTT_HOST, MQTT_PORT)
+                break
+            except Exception as e:
+                print(f"Sensor {self._identity.station_id} connect failed: {e} — retrying in 2s", flush=True)
+                time.sleep(2)
         self._client.loop_forever()
