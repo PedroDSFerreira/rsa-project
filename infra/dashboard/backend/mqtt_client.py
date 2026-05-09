@@ -36,6 +36,7 @@ def _on_message(client, userdata, msg):
             entity_type=payload["entity_type"],
             lat=payload["lat"],
             lng=payload["lng"],
+            container_name=payload.get("container_name", ""),
         )
 
     elif topic == "sim/links":

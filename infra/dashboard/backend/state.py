@@ -7,6 +7,7 @@ class EntityInfo:
     entity_type: str
     lat: float
     lng: float
+    container_name: str = ""
 
 
 @dataclass
