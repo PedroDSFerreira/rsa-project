@@ -83,6 +83,7 @@ class DroneAgent:
         self._waypoint_pos: tuple[float, float] | None = None
         self._grid_sync: GridSync | None = None
         self._known_peers: set[int] = set()
+        self._claim_expiry: dict[int, float] = {}  # cell_index → expiry timestamp
 
         self._entities: dict[int, dict] = {}
         self._collected_data: list[dict] = []
@@ -188,16 +189,23 @@ class DroneAgent:
                 return
             cell_index = mgmt["actionId"]["sequenceNumber"]
             sub_cause = denm["situation"]["eventType"]["subCauseCode"]
+            validity = mgmt.get("validityDuration", 60)
             row, col = self._grid.cell_from_index(cell_index)
             state_map = {0: CellState.CLAIMED, 1: CellState.VISITED, 2: CellState.SENSOR_FOUND}
             new_state = state_map.get(sub_cause)
-            if new_state is not None and new_state > self._grid.get(row, col):
+            if new_state is None:
+                return
+            if new_state > self._grid.get(row, col):
                 self._grid.set(row, col, new_state)
                 print(
                     f"Drone {DRONE_ID} grid update from {originator}: "
                     f"cell ({row},{col}) → {new_state.name}",
                     flush=True,
                 )
+            if new_state == CellState.CLAIMED:
+                self._claim_expiry[cell_index] = time.monotonic() + validity
+            elif cell_index in self._claim_expiry:
+                del self._claim_expiry[cell_index]
         except (KeyError, IndexError, ValueError):
             pass
 
@@ -228,8 +236,21 @@ class DroneAgent:
             elapsed = time.monotonic() - start
             time.sleep(max(0, TICK_MS / 1000 - elapsed))
 
+    def _expire_stale_claims(self):
+        if self._grid is None or not self._claim_expiry:
+            return
+        now = time.monotonic()
+        expired = [idx for idx, exp in self._claim_expiry.items() if now >= exp]
+        for cell_index in expired:
+            del self._claim_expiry[cell_index]
+            row, col = self._grid.cell_from_index(cell_index)
+            if self._grid.get(row, col) == CellState.CLAIMED:
+                self._grid.set(row, col, CellState.UNKNOWN)
+                print(f"Drone {DRONE_ID} claim expired: cell ({row},{col}) → UNKNOWN", flush=True)
+
     def _tick(self):
         self._vanetza.publish_cam(self._lat, self._lng, self._heading, DRONE_SPEED)
+        self._expire_stale_claims()
 
         if self._state == State.IDLE:
             return
