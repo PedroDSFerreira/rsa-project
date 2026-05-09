@@ -9,6 +9,7 @@ from enum import Enum, auto
 import paho.mqtt.client as mqtt
 
 from coverage_grid import CellState, CoverageGrid
+from grid_sync import GridSync
 from traversal import GreedyNearestTraversal, Strip, make_traversal
 from vanetza_client import VanetzaClient
 
@@ -80,6 +81,8 @@ class DroneAgent:
         self._cell_size_m = 50.0
         self._waypoint: tuple[int, int] | None = None
         self._waypoint_pos: tuple[float, float] | None = None
+        self._grid_sync: GridSync | None = None
+        self._known_peers: set[int] = set()
 
         self._entities: dict[int, dict] = {}
         self._collected_data: list[dict] = []
@@ -113,6 +116,8 @@ class DroneAgent:
             self._on_sim_start(payload)
         elif msg.topic == "sim/links":
             self._on_links(payload)
+        elif self._grid_sync and msg.topic == self._grid_sync.topic:
+            self._grid_sync.on_message(payload)
 
     def _on_sim_start(self, payload: dict):
         if self._state != State.IDLE:
@@ -129,6 +134,8 @@ class DroneAgent:
         strip_data = next(s for s in payload["strips"] if s["drone_index"] == drone_index)
         self._strip = Strip(row_min=strip_data["row_min"], row_max=strip_data["row_max"])
         self._traversal = make_traversal(payload["algorithm"], self._strip, self._grid.cols)
+        self._grid_sync = GridSync(DRONE_ID, self._grid, self._central)
+        self._central.subscribe(self._grid_sync.topic)
 
         self._state = State.EXPLORING
         print(
@@ -158,10 +165,15 @@ class DroneAgent:
 
     def _on_cam(self, payload: dict):
         try:
+            sid = payload["stationID"]
             st = payload["fields"]["cam"]["camParameters"]["basicContainer"].get("stationType")
             if self._state == State.RETURNING and st == 15:
                 print(f"Drone {DRONE_ID} received base station CAM → AT_BASE", flush=True)
                 self._state = State.AT_BASE
+            elif st == 10 and sid != DRONE_ID and self._grid_sync:
+                if sid not in self._known_peers:
+                    self._known_peers.add(sid)
+                    self._grid_sync.on_peer_seen(sid)
         except KeyError:
             pass
 
