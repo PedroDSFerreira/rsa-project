@@ -33,12 +33,13 @@ function cellBounds(grid_map, cellIndex) {
   return [[s, w], [n, e]]
 }
 
-function entityIcon(type) {
+function entityIcon(type, label) {
   const color = ENTITY_COLORS[type] ?? '#e0e0e0'
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-    <circle cx="12" cy="12" r="10" fill="${color}" stroke="#fff" stroke-width="2"/>
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+    <circle cx="14" cy="14" r="12" fill="${color}" stroke="#fff" stroke-width="2"/>
+    <text x="14" y="18" text-anchor="middle" font-size="9" font-family="monospace" font-weight="bold" fill="#fff">${label}</text>
   </svg>`
-  return L.divIcon({ html: svg, className: '', iconSize: [24, 24], iconAnchor: [12, 12] })
+  return L.divIcon({ html: svg, className: '', iconSize: [28, 28], iconAnchor: [14, 14] })
 }
 
 const DEFAULT_SW_LAT = 40.630
@@ -113,8 +114,9 @@ export default function MapView() {
       {entityList.map((e) => {
         const idx = e.container_name?.match(/-([0-9]+)$/)?.[1] ?? e.station_id
         const label = e.entity_type === 'base_station' ? 'base station' : `${e.entity_type} #${idx}`
+        const iconLabel = e.entity_type === 'base_station' ? 'B' : e.entity_type === 'drone' ? `D${idx}` : `S${idx}`
         return (
-          <Marker key={e.station_id} position={[e.lat, e.lng]} icon={entityIcon(e.entity_type)}>
+          <Marker key={e.station_id} position={[e.lat, e.lng]} icon={entityIcon(e.entity_type, iconLabel)}>
             <Popup>
               <strong>{label}</strong><br />
               {e.lat.toFixed(5)}, {e.lng.toFixed(5)}<br />
