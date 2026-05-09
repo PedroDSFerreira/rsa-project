@@ -8,6 +8,8 @@ from state import EntityInfo, state
 MQTT_HOST = os.getenv("MQTT_HOST", "mqtt-central")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
+_client: mqtt.Client | None = None
+
 
 def _on_connect(client, userdata, flags, reason_code, properties):
     client.subscribe("sim/meta")
@@ -52,8 +54,14 @@ def _on_message(client, userdata, msg):
 
 
 def start():
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="dashboard-backend")
-    client.on_connect = _on_connect
-    client.on_message = _on_message
-    client.connect(MQTT_HOST, MQTT_PORT)
-    client.loop_start()
+    global _client
+    _client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="dashboard-backend")
+    _client.on_connect = _on_connect
+    _client.on_message = _on_message
+    _client.connect(MQTT_HOST, MQTT_PORT)
+    _client.loop_start()
+
+
+def publish(topic: str, payload: str) -> None:
+    if _client is not None:
+        _client.publish(topic, payload)

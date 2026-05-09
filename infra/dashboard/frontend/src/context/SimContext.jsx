@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useReducer } from 'react'
 
 const WS_URL = `ws://${window.location.hostname}:8000/ws`
+export const API_URL = `http://${window.location.hostname}:8000`
 
 const initialState = { meta: {}, entities: {}, links: [], tick: 0 }
 
