@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Rectangle } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -11,6 +12,26 @@ L.Icon.Default.mergeOptions({
 })
 
 const ENTITY_COLORS = { drone: '#4fc3f7', sensor: '#81c784', base_station: '#ffb74d' }
+
+const CELL_STYLES = {
+  1: { color: '#4fc3f7', fillColor: '#90caf9', fillOpacity: 0.35, weight: 0 }, // CLAIMED
+  2: { color: '#81c784', fillColor: '#a5d6a7', fillOpacity: 0.45, weight: 0 }, // VISITED
+  3: { color: '#ff8f00', fillColor: '#ffb300', fillOpacity: 0.7,  weight: 0 }, // SENSOR_FOUND
+}
+
+function cellBounds(grid_map, cellIndex) {
+  const { sw_lat, sw_lng, width_m, height_m, cell_size_m } = grid_map
+  const cols = Math.ceil(width_m / cell_size_m)
+  const row = Math.floor(cellIndex / cols)
+  const col = cellIndex % cols
+  const mPerLat = 111000
+  const mPerLng = 111000 * Math.cos(sw_lat * Math.PI / 180)
+  const s = sw_lat + row * cell_size_m / mPerLat
+  const w = sw_lng + col * cell_size_m / mPerLng
+  const n = s + cell_size_m / mPerLat
+  const e = w + cell_size_m / mPerLng
+  return [[s, w], [n, e]]
+}
 
 function entityIcon(type) {
   const color = ENTITY_COLORS[type] ?? '#e0e0e0'
@@ -49,12 +70,27 @@ function simAreaCenter(meta) {
 }
 
 export default function MapView() {
-  const { meta, entities, links } = useSim()
+  const { meta, entities, links, grid_map, grid_cells } = useSim()
 
   const center = simAreaCenter(meta)
   const areaBounds = simAreaBounds(meta)
 
   const entityList = Object.values(entities)
+
+  const gridRects = useMemo(() => {
+    if (!grid_map.sw_lat) return []
+    return Object.entries(grid_cells).map(([idx, cellState]) => {
+      const style = CELL_STYLES[cellState]
+      if (!style) return null
+      return (
+        <Rectangle
+          key={idx}
+          bounds={cellBounds(grid_map, Number(idx))}
+          pathOptions={style}
+        />
+      )
+    }).filter(Boolean)
+  }, [grid_map, grid_cells])
 
   const linkLines = links.map(([idA, idB]) => {
     const a = entities[idA]
@@ -71,8 +107,9 @@ export default function MapView() {
       />
       <Rectangle
         bounds={areaBounds}
-        pathOptions={{ color: '#42a5f5', weight: 3, fillColor: '#90caf9', fillOpacity: 0.15, dashArray: '10 6' }}
+        pathOptions={{ color: '#42a5f5', weight: 3, fillColor: '#90caf9', fillOpacity: 0.05, dashArray: '10 6' }}
       />
+      {gridRects}
       {entityList.map((e) => {
         const idx = e.container_name?.match(/-([0-9]+)$/)?.[1] ?? e.station_id
         const label = e.entity_type === 'base_station' ? 'base station' : `${e.entity_type} #${idx}`

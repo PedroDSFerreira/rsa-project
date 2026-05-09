@@ -41,6 +41,20 @@ export default function MissionPanel() {
       </div>
 
       <div style={SECTION}>
+        <div style={TITLE}>Grid legend</div>
+        {[
+          { color: '#90caf9', label: 'Claimed' },
+          { color: '#a5d6a7', label: 'Visited' },
+          { color: '#ffb300', label: 'Sensor found' },
+        ].map(({ color, label }) => (
+          <div key={label} style={{ ...ROW, alignItems: 'center' }}>
+            <span style={{ display: 'inline-block', width: 12, height: 12, background: color, borderRadius: 2, marginRight: 6 }} />
+            <span style={{ fontSize: '12px', flex: 1 }}>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={SECTION}>
         <div style={TITLE}>Entities</div>
         {entityList.length === 0 && <div style={{ fontSize: '12px', color: '#888' }}>Waiting for announcements…</div>}
         {entityList.map((e) => {
