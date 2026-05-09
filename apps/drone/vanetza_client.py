@@ -59,22 +59,40 @@ class VanetzaClient:
         }
         self._client.publish("vanetza/in/cam", json.dumps(payload))
 
-    def publish_denm(self, lat: float, lng: float, sub_cause_code: int, validity_duration: int = 60):
+    def publish_denm(
+        self,
+        lat: float,
+        lng: float,
+        sub_cause_code: int,
+        cell_index: int = 0,
+        station_id: int = 0,
+        validity_duration: int = 60,
+    ):
+        import time as _time
+        t = _time.time()
         payload = {
             "fields": {
                 "denm": {
                     "management": {
+                        "actionId": {
+                            "originatingStationId": station_id,
+                            "sequenceNumber": cell_index,
+                        },
+                        "detectionTime": t,
+                        "referenceTime": t,
                         "eventPosition": {
                             "latitude": lat,
                             "longitude": lng,
                         },
                         "validityDuration": validity_duration,
+                        "stationType": 10,
                     },
                     "situation": {
+                        "informationQuality": 7,
                         "eventType": {
-                            "causeCode": 0,
+                            "causeCode": 97,
                             "subCauseCode": sub_cause_code,
-                        }
+                        },
                     },
                 }
             }
