@@ -6,7 +6,11 @@ IFACE = "br0"
 
 
 def _exec(container_name: str, cmd: str) -> str:
-    container = _client.containers.get(container_name)
+    try:
+        container = _client.containers.get(container_name)
+    except docker.errors.NotFound:
+        print(f"[exec] container not found: {container_name}", flush=True)
+        return ""
     result = container.exec_run(["sh", "-c", cmd])
     output = result.output.decode().strip() if result.output else ""
     if result.exit_code != 0 and output:
