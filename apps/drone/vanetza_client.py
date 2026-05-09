@@ -39,39 +39,35 @@ class VanetzaClient:
     def publish_cam(self, lat: float, lng: float, heading: float, speed: float):
         import time as _time
         payload = {
-            "fields": {
-                "cam": {
-                    "generationDeltaTime": int(_time.time() * 1000) % 65536,
-                    "camParameters": {
-                        "basicContainer": {
-                            "stationType": 10,
-                            "referencePosition": {
-                                "latitude": lat,
-                                "longitude": lng,
-                                "positionConfidenceEllipse": {
-                                    "semiMajorAxisLength": 50,
-                                    "semiMinorAxisLength": 50,
-                                    "semiMajorAxisOrientation": 0,
-                                },
-                                "altitude": {"altitudeValue": 0, "altitudeConfidence": 15},
-                            },
+            "generationDeltaTime": int(_time.time() * 1000) % 65536,
+            "camParameters": {
+                "basicContainer": {
+                    "stationType": 10,
+                    "referencePosition": {
+                        "latitude": lat,
+                        "longitude": lng,
+                        "positionConfidenceEllipse": {
+                            "semiMajorAxisLength": 50,
+                            "semiMinorAxisLength": 50,
+                            "semiMajorAxisOrientation": 0,
                         },
-                        "highFrequencyContainer": {
-                            "basicVehicleContainerHighFrequency": {
-                                "heading": {"headingValue": int(heading * 10), "headingConfidence": 1},
-                                "speed": {"speedValue": int(speed * 100), "speedConfidence": 1},
-                                "driveDirection": 0,
-                                "vehicleLength": {"vehicleLengthValue": 10, "vehicleLengthConfidenceIndication": 0},
-                                "vehicleWidth": 3,
-                                "longitudinalAcceleration": {"value": 0, "confidence": 0},
-                                "curvature": {"curvatureValue": 0, "curvatureConfidence": 7},
-                                "curvatureCalculationMode": 0,
-                                "yawRate": {"yawRateValue": 0, "yawRateConfidence": 8},
-                            }
-                        },
+                        "altitude": {"altitudeValue": 0.0, "altitudeConfidence": 15},
                     },
-                }
-            }
+                },
+                "highFrequencyContainer": {
+                    "basicVehicleContainerHighFrequency": {
+                        "heading": {"headingValue": heading, "headingConfidence": 1},
+                        "speed": {"speedValue": speed, "speedConfidence": 1},
+                        "driveDirection": 0,
+                        "vehicleLength": {"vehicleLengthValue": 3.0, "vehicleLengthConfidenceIndication": 0},
+                        "vehicleWidth": 1.5,
+                        "longitudinalAcceleration": {"value": 0.0, "confidence": 0},
+                        "curvature": {"curvatureValue": 0, "curvatureConfidence": 7},
+                        "curvatureCalculationMode": 0,
+                        "yawRate": {"yawRateValue": 0.0, "yawRateConfidence": 8},
+                    }
+                },
+            },
         }
         self._client.publish("vanetza/in/cam", json.dumps(payload))
 
