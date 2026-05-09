@@ -16,6 +16,7 @@ services:
 
   base_station:
     build: ./apps/base_station
+    container_name: base_station
     cap_add:
       - NET_ADMIN
     environment:
@@ -29,6 +30,7 @@ services:
       - SIM_AREA_HEIGHT_M=${SIM_AREA_HEIGHT_M:-1000}
       - CELL_SIZE_M=${CELL_SIZE_M:-50}
       - NUM_DRONES=${NUM_DRONES:-2}
+      - CONTAINER_NAME=base_station
       - PYTHONUNBUFFERED=1
     networks:
       - vanetzalan0
