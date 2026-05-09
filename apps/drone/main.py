@@ -166,7 +166,28 @@ class DroneAgent:
             pass
 
     def _on_denm(self, payload: dict):
-        pass
+        if self._grid is None:
+            return
+        try:
+            denm = payload["fields"]["denm"]
+            mgmt = denm["management"]
+            originator = mgmt["actionId"]["originatingStationId"]
+            if originator == DRONE_ID:
+                return
+            cell_index = mgmt["actionId"]["sequenceNumber"]
+            sub_cause = denm["situation"]["eventType"]["subCauseCode"]
+            row, col = self._grid.cell_from_index(cell_index)
+            state_map = {0: CellState.CLAIMED, 1: CellState.VISITED, 2: CellState.SENSOR_FOUND}
+            new_state = state_map.get(sub_cause)
+            if new_state is not None and new_state > self._grid.get(row, col):
+                self._grid.set(row, col, new_state)
+                print(
+                    f"Drone {DRONE_ID} grid update from {originator}: "
+                    f"cell ({row},{col}) → {new_state.name}",
+                    flush=True,
+                )
+        except (KeyError, IndexError, ValueError):
+            pass
 
     def _announce(self, ip: str):
         self._central.publish(f"sim/announce/{DRONE_ID}", json.dumps({
