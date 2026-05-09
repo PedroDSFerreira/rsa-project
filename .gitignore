@@ -3,3 +3,4 @@ scripts/
 .env
 infra/dashboard/frontend/node_modules/
 infra/dashboard/frontend/dist/
+**/__pycache__/
