@@ -19,7 +19,6 @@ class Traversal(ABC):
         self,
         grid: CoverageGrid,
         drone_pos: tuple[float, float],
-        strip: Strip,
     ) -> tuple[int, int] | None:
         ...
 
@@ -32,7 +31,6 @@ class BoustrophedonTraversal(Traversal):
         self,
         grid: CoverageGrid,
         drone_pos: tuple[float, float],
-        strip: Strip,
     ) -> tuple[int, int] | None:
         for row, col in self._sequence:
             if grid.get(row, col) == CellState.UNKNOWN:
@@ -45,7 +43,6 @@ class GreedyNearestTraversal(Traversal):
         self,
         grid: CoverageGrid,
         drone_pos: tuple[float, float],
-        strip: Strip,
     ) -> tuple[int, int] | None:
         drone_row, drone_col = grid.coords_to_cell(*drone_pos)
         best: tuple[int, int] | None = None

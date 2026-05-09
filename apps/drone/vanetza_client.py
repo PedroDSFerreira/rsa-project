@@ -86,7 +86,7 @@ class VanetzaClient:
             "management": {
                 "actionId": {
                     "originatingStationId": station_id,
-                    "sequenceNumber": cell_index,
+                    "sequenceNumber": cell_index * 4 + sub_cause_code,
                 },
                 "detectionTime": t,
                 "referenceTime": t,
@@ -102,12 +102,6 @@ class VanetzaClient:
                 },
                 "validityDuration": validity_duration,
                 "stationType": 10,
-            },
-            "situation": {
-                "informationQuality": 7,
-                "eventType": {
-                    "ccAndScc": {"dangerousSituation97": sub_cause_code},
-                },
             },
         }
         self._client.publish("vanetza/in/denm", json.dumps(payload))

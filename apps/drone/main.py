@@ -25,8 +25,6 @@ MQTT_CENTRAL_HOST = os.getenv("MQTT_HOST", "mqtt-central")
 MQTT_CENTRAL_PORT = int(os.getenv("MQTT_PORT", "1883"))
 TICK_MS = int(os.getenv("TICK_REAL_MS", "500"))
 DRONE_SPEED = float(os.getenv("DRONE_SPEED_M_S", "5.0"))
-BASE_STATION_LAT = float(os.getenv("BASE_STATION_LAT", "40.633"))
-BASE_STATION_LNG = float(os.getenv("BASE_STATION_LNG", "-8.662"))
 
 METERS_PER_LAT = 111000.0
 
@@ -77,6 +75,10 @@ class DroneAgent:
         self._lng = DRONE_LNG
         self._heading = 0.0
 
+        # Discovered at runtime — not assumed from env
+        self._base_location: tuple[float, float] | None = None
+        self._pending_start: dict | None = None  # sim/start buffered until base location is known
+
         self._grid: CoverageGrid | None = None
         self._strip: Strip | None = None
         self._traversal = None
@@ -85,7 +87,7 @@ class DroneAgent:
         self._waypoint_pos: tuple[float, float] | None = None
         self._grid_sync: GridSync | None = None
         self._known_peers: set[int] = set()
-        self._claim_expiry: dict[int, float] = {}  # cell_index → expiry timestamp
+        self._claim_expiry: dict[int, float] = {}
 
         self._entities: dict[int, dict] = {}
         self._collected_data: list[dict] = []
@@ -93,6 +95,8 @@ class DroneAgent:
         self._pending_sensor_id: int | None = None
         self._at_base_delivered = False
         self._lock = threading.Lock()
+        self._sensor_response: dict | None = None
+        self._sensor_response_event = threading.Event()
 
         self._central = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"drone-central-{DRONE_ID}")
         self._central.on_connect = self._on_central_connect
@@ -102,10 +106,13 @@ class DroneAgent:
         self._vanetza.on_cam(self._on_cam)
         self._vanetza.on_denm(self._on_denm)
 
+    # ── MQTT handlers ──────────────────────────────────────────────────────
+
     def _on_central_connect(self, client, userdata, flags, reason_code, properties):
         client.subscribe("sim/announce/+")
         client.subscribe("sim/start")
         client.subscribe("sim/links")
+        client.subscribe(f"sensor/+/response/{DRONE_ID}")
         print(f"Drone {DRONE_ID} connected to mqtt-central: {reason_code}", flush=True)
 
     def _on_central_message(self, client, userdata, msg):
@@ -119,12 +126,83 @@ class DroneAgent:
             self._on_sim_start(payload)
         elif msg.topic == "sim/links":
             self._on_links(payload)
+        elif msg.topic.startswith("sensor/") and msg.topic.endswith(f"/response/{DRONE_ID}"):
+            self._sensor_response = payload
+            self._sensor_response_event.set()
         elif self._grid_sync and msg.topic == self._grid_sync.topic:
             self._grid_sync.on_message(payload)
 
     def _on_sim_start(self, payload: dict):
         if self._state != State.IDLE:
             return
+        if self._base_location is not None:
+            self._start_exploring(payload)
+        else:
+            self._pending_start = payload
+
+    def _on_links(self, payload: dict):
+        if self._state != State.EXPLORING:
+            return
+        for id_a, id_b in payload.get("connected", []):
+            sensor_id = None
+            if id_a == DRONE_ID and self._is_sensor(id_b):
+                sensor_id = id_b
+            elif id_b == DRONE_ID and self._is_sensor(id_a):
+                sensor_id = id_a
+            if sensor_id and sensor_id not in self._collected_sensors:
+                with self._lock:
+                    if self._pending_sensor_id is None:
+                        self._pending_sensor_id = sensor_id
+                break
+
+    def _on_cam(self, payload: dict):
+        try:
+            params = payload["fields"]["cam"]["camParameters"]
+            st = params["basicContainer"].get("stationType")
+            if st == 15:
+                pos = params["basicContainer"]["referencePosition"]
+                self._base_location = (pos["latitude"], pos["longitude"])
+                if self._state == State.IDLE and self._pending_start:
+                    self._start_exploring(self._pending_start)
+                    self._pending_start = None
+            elif st == 10:
+                sid = payload["stationID"]
+                if sid != DRONE_ID and self._grid_sync:
+                    if sid not in self._known_peers:
+                        self._known_peers.add(sid)
+                        self._grid_sync.on_peer_seen(sid)
+        except KeyError:
+            pass
+
+    def _on_denm(self, payload: dict):
+        if self._grid is None:
+            return
+        try:
+            denm = payload.get("fields", {}).get("denm") or payload
+            mgmt = denm["management"]
+            originator = mgmt["actionId"]["originatingStationId"]
+            if originator == DRONE_ID:
+                return
+            encoded = mgmt["actionId"]["sequenceNumber"]
+            cell_index, sub_cause = divmod(encoded, 4)
+            validity = mgmt.get("validityDuration", 60)
+            row, col = self._grid.cell_from_index(cell_index)
+            state_map = {0: CellState.CLAIMED, 1: CellState.VISITED, 2: CellState.SENSOR_FOUND}
+            new_state = state_map.get(sub_cause)
+            if new_state is None:
+                return
+            if new_state > self._grid.get(row, col):
+                self._grid.set(row, col, new_state)
+            if new_state == CellState.CLAIMED:
+                self._claim_expiry[cell_index] = time.monotonic() + validity
+            elif cell_index in self._claim_expiry:
+                del self._claim_expiry[cell_index]
+        except (KeyError, IndexError, ValueError):
+            pass
+
+    # ── Lifecycle ──────────────────────────────────────────────────────────
+
+    def _start_exploring(self, payload: dict):
         m = payload["map"]
         self._grid = CoverageGrid(
             sw_lat=m["sw_lat"], sw_lng=m["sw_lng"],
@@ -142,76 +220,11 @@ class DroneAgent:
 
         self._state = State.EXPLORING
         print(
-            f"Drone {DRONE_ID} received sim/start → EXPLORING "
-            f"(strip rows {self._strip.row_min}–{self._strip.row_max})",
+            f"Drone {DRONE_ID} → EXPLORING "
+            f"(strip rows {self._strip.row_min}–{self._strip.row_max}, "
+            f"base at {self._base_location})",
             flush=True,
         )
-
-    def _on_links(self, payload: dict):
-        if self._state != State.EXPLORING:
-            return
-        for id_a, id_b in payload.get("connected", []):
-            sensor_id = None
-            if id_a == DRONE_ID and self._is_sensor(id_b):
-                sensor_id = id_b
-            elif id_b == DRONE_ID and self._is_sensor(id_a):
-                sensor_id = id_a
-            if sensor_id and sensor_id not in self._collected_sensors:
-                with self._lock:
-                    if self._pending_sensor_id is None:
-                        self._pending_sensor_id = sensor_id
-                break
-
-    def _is_sensor(self, station_id: int) -> bool:
-        entity = self._entities.get(station_id)
-        return entity is not None and entity.get("entity_type") == "sensor"
-
-    def _on_cam(self, payload: dict):
-        try:
-            sid = payload["stationID"]
-            st = payload["fields"]["cam"]["camParameters"]["basicContainer"].get("stationType")
-            if self._state == State.RETURNING and st == 15:
-                print(f"Drone {DRONE_ID} received base station CAM → AT_BASE", flush=True)
-                self._state = State.AT_BASE
-            elif st == 10 and sid != DRONE_ID and self._grid_sync:
-                if sid not in self._known_peers:
-                    self._known_peers.add(sid)
-                    self._grid_sync.on_peer_seen(sid)
-        except KeyError:
-            pass
-
-    def _on_denm(self, payload: dict):
-        if self._grid is None:
-            return
-        try:
-            denm = payload.get("fields", {}).get("denm") or payload
-            mgmt = denm["management"]
-            originator = mgmt["actionId"]["originatingStationId"]
-            if originator == DRONE_ID:
-                return
-            cell_index = mgmt["actionId"]["sequenceNumber"]
-            sub_cause = denm["situation"]["eventType"]["ccAndScc"].get("dangerousSituation97")
-            if sub_cause is None:
-                return
-            validity = mgmt.get("validityDuration", 60)
-            row, col = self._grid.cell_from_index(cell_index)
-            state_map = {0: CellState.CLAIMED, 1: CellState.VISITED, 2: CellState.SENSOR_FOUND}
-            new_state = state_map.get(sub_cause)
-            if new_state is None:
-                return
-            if new_state > self._grid.get(row, col):
-                self._grid.set(row, col, new_state)
-                print(
-                    f"Drone {DRONE_ID} grid update from {originator}: "
-                    f"cell ({row},{col}) → {new_state.name}",
-                    flush=True,
-                )
-            if new_state == CellState.CLAIMED:
-                self._claim_expiry[cell_index] = time.monotonic() + validity
-            elif cell_index in self._claim_expiry:
-                del self._claim_expiry[cell_index]
-        except (KeyError, IndexError, ValueError):
-            pass
 
     def _announce(self, ip: str):
         self._central.publish(f"sim/announce/{DRONE_ID}", json.dumps({
@@ -243,17 +256,7 @@ class DroneAgent:
             elapsed = time.monotonic() - start
             time.sleep(max(0, TICK_MS / 1000 - elapsed))
 
-    def _expire_stale_claims(self):
-        if self._grid is None or not self._claim_expiry:
-            return
-        now = time.monotonic()
-        expired = [idx for idx, exp in self._claim_expiry.items() if now >= exp]
-        for cell_index in expired:
-            del self._claim_expiry[cell_index]
-            row, col = self._grid.cell_from_index(cell_index)
-            if self._grid.get(row, col) == CellState.CLAIMED:
-                self._grid.set(row, col, CellState.UNKNOWN)
-                print(f"Drone {DRONE_ID} claim expired: cell ({row},{col}) → UNKNOWN", flush=True)
+    # ── Tick ───────────────────────────────────────────────────────────────
 
     def _tick(self):
         self._vanetza.publish_cam(self._lat, self._lng, self._heading, DRONE_SPEED)
@@ -270,6 +273,17 @@ class DroneAgent:
                 self._at_base_delivered = True
                 self._deliver_data()
 
+    def _expire_stale_claims(self):
+        if self._grid is None or not self._claim_expiry:
+            return
+        now = time.monotonic()
+        expired = [idx for idx, exp in self._claim_expiry.items() if now >= exp]
+        for cell_index in expired:
+            del self._claim_expiry[cell_index]
+            row, col = self._grid.cell_from_index(cell_index)
+            if self._grid.get(row, col) == CellState.CLAIMED:
+                self._grid.set(row, col, CellState.UNKNOWN)
+
     def _tick_exploring(self):
         with self._lock:
             sensor_id = self._pending_sensor_id
@@ -277,15 +291,17 @@ class DroneAgent:
 
         if sensor_id is not None:
             self._state = State.COLLECTING
-            self._collect_sensor(sensor_id)
-            self._state = State.EXPLORING
+            try:
+                self._collect_sensor(sensor_id)
+            finally:
+                self._state = State.EXPLORING
             return
 
         if self._waypoint is None:
-            nxt = self._traversal.next_waypoint(self._grid, (self._lat, self._lng), self._strip)
+            nxt = self._traversal.next_waypoint(self._grid, (self._lat, self._lng))
             if nxt is None:
                 self._traversal = GreedyNearestTraversal()
-                nxt = self._traversal.next_waypoint(self._grid, (self._lat, self._lng), self._strip)
+                nxt = self._traversal.next_waypoint(self._grid, (self._lat, self._lng))
             if nxt is None:
                 print(f"Drone {DRONE_ID} all cells covered → RETURNING", flush=True)
                 self._state = State.RETURNING
@@ -327,50 +343,38 @@ class DroneAgent:
             self._lat, self._lng = _step_toward(self._lat, self._lng, target_lat, target_lng, step)
 
     def _tick_returning(self):
+        base_lat, base_lng = self._base_location
         step = DRONE_SPEED * (TICK_MS / 1000)
-        dist = _distance_m(self._lat, self._lng, BASE_STATION_LAT, BASE_STATION_LNG)
-        self._heading = _heading_deg(self._lat, self._lng, BASE_STATION_LAT, BASE_STATION_LNG)
-        if dist > step:
-            self._lat, self._lng = _step_toward(
-                self._lat, self._lng, BASE_STATION_LAT, BASE_STATION_LNG, step
-            )
+        dist = _distance_m(self._lat, self._lng, base_lat, base_lng)
+        if dist <= step:
+            self._lat, self._lng = base_lat, base_lng
+            print(f"Drone {DRONE_ID} arrived at base → AT_BASE", flush=True)
+            self._state = State.AT_BASE
+            return
+        self._heading = _heading_deg(self._lat, self._lng, base_lat, base_lng)
+        self._lat, self._lng = _step_toward(self._lat, self._lng, base_lat, base_lng, step)
+
+    # ── Sensor collection & data delivery ──────────────────────────────────
 
     def _collect_sensor(self, sensor_id: int):
-        sensor = self._entities.get(sensor_id)
-        if not sensor:
+        self._collected_sensors.add(sensor_id)
+        if not self._entities.get(sensor_id):
             return
-        print(f"Drone {DRONE_ID} collecting from sensor {sensor_id} at {sensor['ip']}", flush=True)
+        print(f"Drone {DRONE_ID} collecting from sensor {sensor_id}", flush=True)
 
-        result: dict = {}
-        done = threading.Event()
-
-        def on_connect(c, u, f, rc, p):
-            c.subscribe("sensor/data_response")
-            c.publish("sensor/request_data", json.dumps({"requester_id": DRONE_ID}))
-
-        def on_message(c, u, msg):
-            result["data"] = json.loads(msg.payload)
-            done.set()
-
-        client = mqtt.Client(
-            mqtt.CallbackAPIVersion.VERSION2,
-            client_id=f"drone-collect-{DRONE_ID}-{sensor_id}",
+        self._sensor_response = None
+        self._sensor_response_event.clear()
+        self._central.publish(
+            f"sensor/{sensor_id}/request",
+            json.dumps({"requester_id": DRONE_ID}),
         )
-        client.on_connect = on_connect
-        client.on_message = on_message
-        client.connect(sensor["ip"], 1883)
-        client.loop_start()
-        done.wait(timeout=5.0)
-        client.loop_stop()
-        client.disconnect()
-
-        data = result.get("data")
+        self._sensor_response_event.wait(timeout=5.0)
+        data = self._sensor_response
         if not data:
             print(f"Drone {DRONE_ID} sensor {sensor_id} collection timed out", flush=True)
             return
 
         self._collected_data.append({"sensor_id": sensor_id, "payload": data})
-        self._collected_sensors.add(sensor_id)
 
         slat, slng = sensor["lat"], sensor["lng"]
         row, col = self._grid.coords_to_cell(slat, slng)
@@ -387,7 +391,7 @@ class DroneAgent:
     def _deliver_data(self):
         base = self._entities.get(1)
         if not base:
-            print(f"Drone {DRONE_ID} base station not found in entity registry", flush=True)
+            print(f"Drone {DRONE_ID} base station not in entity registry", flush=True)
             return
 
         client = mqtt.Client(
@@ -407,6 +411,10 @@ class DroneAgent:
             f"Drone {DRONE_ID} delivered {len(self._collected_data)} sensor datasets to base",
             flush=True,
         )
+
+    def _is_sensor(self, station_id: int) -> bool:
+        entity = self._entities.get(station_id)
+        return entity is not None and entity.get("entity_type") == "sensor"
 
 
 if __name__ == "__main__":
