@@ -57,11 +57,13 @@ class ProximityManager:
     def _handle_time_cam(self, payload: dict):
         try:
             sid = payload.get("stationID")
+            entity = self._entities.get(sid)
+            if not entity or entity.entity_type != "drone":
+                return
             cam = payload.get("camParameters") or payload.get("fields", {}).get("cam", {}).get("camParameters", {})
             pos = cam["basicContainer"]["referencePosition"]
-            if sid and sid in self._entities:
-                self._entities[sid].lat = pos["latitude"]
-                self._entities[sid].lng = pos["longitude"]
+            entity.lat = pos["latitude"]
+            entity.lng = pos["longitude"]
         except (KeyError, TypeError):
             pass
 
@@ -112,7 +114,8 @@ class ProximityManager:
         print(f"All {self._expected} entities announced", flush=True)
 
     def _confirm_filters(self):
-        deadline = time.monotonic() + 30
+        tick_s = self._tick_ms / 1000
+        deadline = time.monotonic() + tick_s * 5
         vanetza = [e for e in self._entities.values() if e.has_vanetza]
         if len(vanetza) < 2:
             return
@@ -121,8 +124,8 @@ class ProximityManager:
             a, b = vanetza[0], vanetza[1]
             if filter_present(a.container_name, b.mac):
                 break
-            print("Filter not confirmed — retrying in 1s...", flush=True)
-            time.sleep(1)
+            print("Filter not confirmed — retrying...", flush=True)
+            time.sleep(tick_s)
 
     def run(self):
         self._client.connect(MQTT_HOST, MQTT_PORT)
