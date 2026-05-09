@@ -95,7 +95,7 @@ export default function MapView() {
   const linkLines = links.map(([idA, idB]) => {
     const a = entities[idA]
     const b = entities[idB]
-    if (!a || !b) return null
+    if (!a || !b || a.entity_type === 'sensor' || b.entity_type === 'sensor') return null
     return <Polyline key={`${idA}-${idB}`} positions={[[a.lat, a.lng], [b.lat, b.lng]]} color="#4fc3f7" opacity={0.6} weight={1.5} />
   }).filter(Boolean)
 
