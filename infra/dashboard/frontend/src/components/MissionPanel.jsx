@@ -1,4 +1,5 @@
-import { useSim } from '../context/SimContext'
+import { useState } from 'react'
+import { useSim, API_URL } from '../context/SimContext'
 
 const PANEL = {
   width: '280px',
@@ -14,22 +15,37 @@ const PANEL = {
 const SECTION = { background: '#0f3460', borderRadius: '6px', padding: '12px' }
 const TITLE = { fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', color: '#90caf9', marginBottom: '8px' }
 const ROW = { display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }
+const BTN = { width: '100%', padding: '10px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', background: '#1b5e20', color: '#fff' }
+const BTN_SENT = { ...BTN, background: '#37474f', cursor: 'default' }
 
 export default function MissionPanel() {
   const { meta, entities, links, tick } = useSim()
+  const [started, setStarted] = useState(false)
+
+  function handleStart() {
+    fetch(`${API_URL}/start`, { method: 'POST' }).then(() => setStarted(true))
+  }
 
   const entityList = Object.values(entities)
   const drones = entityList.filter((e) => e.entity_type === 'drone')
   const sensors = entityList.filter((e) => e.entity_type === 'sensor')
-  const running = drones.length > 0
+  const expected = (meta.num_drones ?? 0) + (meta.num_sensors ?? 0) + 1
+  const allDiscovered = expected > 1 && entityList.length >= expected
+
+  const statusColor = allDiscovered ? '#81c784' : entityList.length > 0 ? '#ffb74d' : '#90caf9'
+  const statusText = allDiscovered ? '● Active' : entityList.length > 0 ? '○ Discovering entities…' : '○ Waiting…'
 
   return (
     <div style={PANEL}>
       <div style={SECTION}>
+        <div style={TITLE}>Control</div>
+        <button style={started ? BTN_SENT : BTN} onClick={handleStart} disabled={started}>
+          {started ? 'Mission started' : 'Start mission'}
+        </button>
+      </div>
+      <div style={SECTION}>
         <div style={TITLE}>Status</div>
-        <div style={{ fontSize: '13px', color: running ? '#81c784' : '#ffb74d' }}>
-          {running ? '● Mission running' : '○ Waiting for entities…'}
-        </div>
+        <div style={{ fontSize: '13px', color: statusColor }}>{statusText}</div>
       </div>
 
       <div style={SECTION}>

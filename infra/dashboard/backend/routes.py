@@ -3,6 +3,7 @@ import dataclasses
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+import mqtt_client
 from state import state
 
 router = APIRouter()
@@ -22,6 +23,12 @@ def _serialise():
 @router.get("/state")
 def get_state():
     return _serialise()
+
+
+@router.post("/start")
+def post_start():
+    mqtt_client.publish("sim/command/start", "{}")
+    return {"status": "sent"}
 
 
 @router.websocket("/ws")

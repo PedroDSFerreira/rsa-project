@@ -6,7 +6,7 @@ import socket
 import paho.mqtt.client as mqtt
 
 STATION_ID = 1
-CONTAINER_NAME = "base_station"
+CONTAINER_NAME = os.environ.get("CONTAINER_NAME", "base_station")
 LAT = float(os.environ["VANETZA_LATITUDE"])
 LNG = float(os.environ["VANETZA_LONGITUDE"])
 MAC = os.environ["VANETZA_MAC_ADDRESS"]
@@ -48,6 +48,7 @@ class BaseStationAgent:
 
         self._central = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="base-station-central")
         self._central.on_connect = self._on_central_connect
+        self._central.on_message = self._on_central_message
 
         self._local = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="base-station-local")
         self._local.on_connect = self._on_local_connect
@@ -55,6 +56,7 @@ class BaseStationAgent:
 
     def _on_central_connect(self, client, userdata, flags, reason_code, properties):
         print(f"Base station connected to mqtt-central: {reason_code}", flush=True)
+        client.subscribe("sim/command/start")
         client.publish(f"sim/announce/{STATION_ID}", json.dumps({
             "station_id":     STATION_ID,
             "mac":            MAC,
@@ -64,6 +66,12 @@ class BaseStationAgent:
             "lng":            LNG,
             "entity_type":    "base_station",
         }), retain=True)
+
+    def _on_central_message(self, client, userdata, msg):
+        if msg.topic == "sim/command/start":
+            self._publish_sim_start(client)
+
+    def _publish_sim_start(self, client):
         sim_start = {
             "map": {
                 "sw_lat":      SIM_SW_LAT,
