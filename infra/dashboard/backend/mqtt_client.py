@@ -62,9 +62,11 @@ def _on_message(client, userdata, msg):
 
     elif "/vanetza/out/denm" in topic:
         try:
-            mgmt = payload["fields"]["denm"]["management"]
-            cell_index = mgmt["actionId"]["sequenceNumber"]
-            sub_cause = payload["fields"]["denm"]["situation"]["eventType"]["subCauseCode"]
+            denm = payload["fields"]["denm"]
+            cell_index = denm["management"]["actionId"]["sequenceNumber"]
+            sub_cause = denm["situation"]["eventType"]["ccAndScc"].get("dangerousSituation97")
+            if sub_cause is None:
+                return
             new_state = sub_cause + 1  # 0→1(CLAIMED), 1→2(VISITED), 2→3(SENSOR_FOUND)
             if new_state > state.grid_cells.get(cell_index, 0):
                 state.grid_cells[cell_index] = new_state

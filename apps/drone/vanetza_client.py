@@ -83,31 +83,32 @@ class VanetzaClient:
         import time as _time
         t = _time.time()
         payload = {
-            "fields": {
-                "denm": {
-                    "management": {
-                        "actionId": {
-                            "originatingStationId": station_id,
-                            "sequenceNumber": cell_index,
-                        },
-                        "detectionTime": t,
-                        "referenceTime": t,
-                        "eventPosition": {
-                            "latitude": lat,
-                            "longitude": lng,
-                        },
-                        "validityDuration": validity_duration,
-                        "stationType": 10,
+            "management": {
+                "actionId": {
+                    "originatingStationId": station_id,
+                    "sequenceNumber": cell_index,
+                },
+                "detectionTime": t,
+                "referenceTime": t,
+                "eventPosition": {
+                    "latitude": lat,
+                    "longitude": lng,
+                    "positionConfidenceEllipse": {
+                        "semiMajorConfidence": 0,
+                        "semiMinorConfidence": 0,
+                        "semiMajorOrientation": 0,
                     },
-                    "situation": {
-                        "informationQuality": 7,
-                        "eventType": {
-                            "causeCode": 97,
-                            "subCauseCode": sub_cause_code,
-                        },
-                    },
-                }
-            }
+                    "altitude": {"altitudeValue": 0, "altitudeConfidence": 1},
+                },
+                "validityDuration": validity_duration,
+                "stationType": 10,
+            },
+            "situation": {
+                "informationQuality": 7,
+                "eventType": {
+                    "ccAndScc": {"dangerousSituation97": sub_cause_code},
+                },
+            },
         }
         self._client.publish("vanetza/in/denm", json.dumps(payload))
 

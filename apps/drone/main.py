@@ -190,7 +190,9 @@ class DroneAgent:
             if originator == DRONE_ID:
                 return
             cell_index = mgmt["actionId"]["sequenceNumber"]
-            sub_cause = denm["situation"]["eventType"]["subCauseCode"]
+            sub_cause = denm["situation"]["eventType"]["ccAndScc"].get("dangerousSituation97")
+            if sub_cause is None:
+                return
             validity = mgmt.get("validityDuration", 60)
             row, col = self._grid.cell_from_index(cell_index)
             state_map = {0: CellState.CLAIMED, 1: CellState.VISITED, 2: CellState.SENSOR_FOUND}
