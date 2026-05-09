@@ -8,7 +8,7 @@ CONTAINER_NAME=$(curl -sf --unix-socket /var/run/docker.sock \
 INDEX=$(echo "$CONTAINER_NAME" | rev | cut -d'-' -f1 | rev)
 
 export VANETZA_STATION_ID=$((10 + INDEX))
-export VANETZA_STATION_TYPE=15
+export VANETZA_STATION_TYPE=10
 export VANETZA_MAC_ADDRESS="6e:06:e0:03:02:$(printf '%02x' "$INDEX")"
 export VANETZA_INTERFACE=br0
 export VANETZA_USE_HARDCODED_GPS=true
