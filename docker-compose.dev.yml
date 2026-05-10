@@ -48,6 +48,7 @@ services:
       - BASE_STATION_LNG=${BASE_STATION_LNG:--8.662}
       - TICK_REAL_MS=${TICK_REAL_MS:-500}
       - DRONE_SPEED_M_S=${DRONE_SPEED_M_S:-5.0}
+      - DRONE_COLLECTION_TIME_S=${DRONE_COLLECTION_TIME_S:-3.0}
       - PYTHONUNBUFFERED=1
     networks:
       - vanetzalan0

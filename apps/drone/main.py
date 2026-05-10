@@ -25,6 +25,7 @@ MQTT_CENTRAL_HOST = os.getenv("MQTT_HOST", "mqtt-central")
 MQTT_CENTRAL_PORT = int(os.getenv("MQTT_PORT", "1883"))
 TICK_MS = int(os.getenv("TICK_REAL_MS", "500"))
 DRONE_SPEED = float(os.getenv("DRONE_SPEED_M_S", "5.0"))
+COLLECTION_TIME_S = float(os.getenv("DRONE_COLLECTION_TIME_S", "3.0"))
 
 METERS_PER_LAT = 111000.0
 
@@ -90,11 +91,12 @@ class DroneAgent:
         self._claim_expiry: dict[int, float] = {}
 
         self._entities: dict[int, dict] = {}
+        self._in_range_peers: set[int] = set()  # updated from sim/links; used when MAC filtering is unavailable
         self._collected_data: list[dict] = []
         self._collected_sensors: set[int] = set()
-        self._pending_sensor_id: int | None = None
+        self._sensor_target_id: int | None = None       # sensor to navigate to before collecting
+        self._current_collection_sensor_id: int | None = None  # guards response handler
         self._at_base_delivered = False
-        self._lock = threading.Lock()
         self._sensor_response: dict | None = None
         self._sensor_response_event = threading.Event()
 
@@ -127,8 +129,13 @@ class DroneAgent:
         elif msg.topic == "sim/links":
             self._on_links(payload)
         elif msg.topic.startswith("sensor/") and msg.topic.endswith(f"/response/{DRONE_ID}"):
-            self._sensor_response = payload
-            self._sensor_response_event.set()
+            try:
+                responding_sid = int(msg.topic.split("/")[1])
+                if responding_sid == self._current_collection_sensor_id:
+                    self._sensor_response = payload
+                    self._sensor_response_event.set()
+            except (ValueError, IndexError):
+                pass
         elif self._grid_sync and msg.topic == self._grid_sync.topic:
             self._grid_sync.on_message(payload)
 
@@ -141,7 +148,19 @@ class DroneAgent:
             self._pending_start = payload
 
     def _on_links(self, payload: dict):
-        if self._state != State.EXPLORING:
+        # Always keep the in-range peer set current (used as fallback when
+        # MAC-level ebtables filtering is unavailable, e.g. on WSL2).
+        in_range: set[int] = set()
+        for id_a, id_b in payload.get("connected", []):
+            if id_a == DRONE_ID:
+                in_range.add(id_b)
+            elif id_b == DRONE_ID:
+                in_range.add(id_a)
+        self._in_range_peers = in_range
+
+        if self._state not in (State.EXPLORING, State.COLLECTING):
+            return
+        if self._sensor_target_id is not None:
             return
         for id_a, id_b in payload.get("connected", []):
             sensor_id = None
@@ -150,9 +169,7 @@ class DroneAgent:
             elif id_b == DRONE_ID and self._is_sensor(id_a):
                 sensor_id = id_a
             if sensor_id and sensor_id not in self._collected_sensors:
-                with self._lock:
-                    if self._pending_sensor_id is None:
-                        self._pending_sensor_id = sensor_id
+                self._sensor_target_id = sensor_id
                 break
 
     def _on_cam(self, payload: dict):
@@ -160,6 +177,7 @@ class DroneAgent:
             params = payload["fields"]["cam"]["camParameters"]
             st = params["basicContainer"].get("stationType")
             if st == 15:
+                # Base station: always accept — needed for initial location discovery
                 pos = params["basicContainer"]["referencePosition"]
                 self._base_location = (pos["latitude"], pos["longitude"])
                 if self._state == State.IDLE and self._pending_start:
@@ -167,6 +185,10 @@ class DroneAgent:
                     self._pending_start = None
             elif st == 10:
                 sid = payload["stationID"]
+                # Application-level proximity filter: ignore peers not listed in sim/links.
+                # This is the fallback when MAC-level ebtables filtering is unavailable (e.g. WSL2).
+                if sid not in self._in_range_peers:
+                    return
                 if sid != DRONE_ID and self._grid_sync:
                     if sid not in self._known_peers:
                         self._known_peers.add(sid)
@@ -182,6 +204,9 @@ class DroneAgent:
             mgmt = denm["management"]
             originator = mgmt["actionId"]["originatingStationId"]
             if originator == DRONE_ID:
+                return
+            # Application-level proximity filter (fallback when ebtables is unavailable)
+            if self._in_range_peers and originator not in self._in_range_peers:
                 return
             encoded = mgmt["actionId"]["sequenceNumber"]
             cell_index, sub_cause = divmod(encoded, 4)
@@ -285,16 +310,8 @@ class DroneAgent:
                 self._grid.set(row, col, CellState.UNKNOWN)
 
     def _tick_exploring(self):
-        with self._lock:
-            sensor_id = self._pending_sensor_id
-            self._pending_sensor_id = None
-
-        if sensor_id is not None:
-            self._state = State.COLLECTING
-            try:
-                self._collect_sensor(sensor_id)
-            finally:
-                self._state = State.EXPLORING
+        if self._sensor_target_id is not None:
+            self._tick_goto_sensor()
             return
 
         if self._waypoint is None:
@@ -342,6 +359,39 @@ class DroneAgent:
             self._heading = _heading_deg(self._lat, self._lng, target_lat, target_lng)
             self._lat, self._lng = _step_toward(self._lat, self._lng, target_lat, target_lng, step)
 
+    def _tick_goto_sensor(self):
+        """Navigate to the target sensor's position, then collect once arrived."""
+        sensor = self._entities.get(self._sensor_target_id)
+        if sensor is None:
+            return  # Entity info not yet received; wait
+
+        slat, slng = sensor["lat"], sensor["lng"]
+        step = DRONE_SPEED * (TICK_MS / 1000)
+        dist = _distance_m(self._lat, self._lng, slat, slng)
+
+        if dist <= step:
+            self._lat, self._lng = slat, slng
+            sensor_id = self._sensor_target_id
+            self._sensor_target_id = None
+            self._abandon_waypoint()
+            self._state = State.COLLECTING
+            try:
+                self._collect_sensor(sensor_id)
+            finally:
+                self._state = State.EXPLORING
+        else:
+            self._heading = _heading_deg(self._lat, self._lng, slat, slng)
+            self._lat, self._lng = _step_toward(self._lat, self._lng, slat, slng, step)
+
+    def _abandon_waypoint(self):
+        """Revert a claimed-but-unvisited waypoint back to UNKNOWN so it can be re-claimed."""
+        if self._waypoint is not None and self._grid is not None:
+            row, col = self._waypoint
+            if self._grid.get(row, col) == CellState.CLAIMED:
+                self._grid.set(row, col, CellState.UNKNOWN)
+        self._waypoint = None
+        self._waypoint_pos = None
+
     def _tick_returning(self):
         base_lat, base_lng = self._base_location
         step = DRONE_SPEED * (TICK_MS / 1000)
@@ -358,21 +408,30 @@ class DroneAgent:
 
     def _collect_sensor(self, sensor_id: int):
         self._collected_sensors.add(sensor_id)
-        if not self._entities.get(sensor_id):
+        sensor = self._entities.get(sensor_id)
+        if not sensor:
             return
-        print(f"Drone {DRONE_ID} collecting from sensor {sensor_id}", flush=True)
+        print(f"Drone {DRONE_ID} collecting from sensor {sensor_id} (transfer time: {COLLECTION_TIME_S}s)", flush=True)
 
+        self._current_collection_sensor_id = sensor_id
         self._sensor_response = None
         self._sensor_response_event.clear()
         self._central.publish(
             f"sensor/{sensor_id}/request",
             json.dumps({"requester_id": DRONE_ID}),
         )
+
+        # Wait for sensor acknowledgement (fast network round-trip)
         self._sensor_response_event.wait(timeout=5.0)
+        self._current_collection_sensor_id = None
+
         data = self._sensor_response
         if not data:
             print(f"Drone {DRONE_ID} sensor {sensor_id} collection timed out", flush=True)
             return
+
+        # Simulate data transfer duration — drone stays put in COLLECTING state
+        time.sleep(COLLECTION_TIME_S)
 
         self._collected_data.append({"sensor_id": sensor_id, "payload": data})
 
