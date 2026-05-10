@@ -17,8 +17,6 @@ class VanetzaClient:
     def _on_connect(self, client, userdata, flags, reason_code, properties):
         client.subscribe("vanetza/out/cam")
         client.subscribe("vanetza/out/denm")
-        client.subscribe("vanetza/time/denm")  # echo of own sent DENMs
-        print("[vanetza] connected to local broker", flush=True)
 
     def _on_message(self, client, userdata, msg):
         try:
@@ -31,13 +29,6 @@ class VanetzaClient:
         elif msg.topic == "vanetza/out/denm":
             for cb in self._denm_callbacks:
                 cb(payload)
-        elif msg.topic == "vanetza/time/denm":
-            try:
-                denm = payload.get("fields", {}).get("denm") or payload
-                seq = denm["management"]["actionId"]["sequenceNumber"]
-                print(f"[vanetza] time/denm echo received: seq={seq}", flush=True)
-            except (KeyError, TypeError):
-                print(f"[vanetza] time/denm echo received (unparseable): {payload}", flush=True)
 
     def on_cam(self, callback):
         self._cam_callbacks.append(callback)
@@ -113,8 +104,6 @@ class VanetzaClient:
                 "stationType": 10,
             },
         }
-        seq = cell_index * 4 + sub_cause_code
-        print(f"[vanetza] publishing DENM: cell={cell_index}, sub_cause={sub_cause_code}, seq={seq}", flush=True)
         self._client.publish("vanetza/in/denm", json.dumps(payload))
 
     def connect(self):

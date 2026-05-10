@@ -169,7 +169,12 @@ class DroneAgent:
             elif id_b == DRONE_ID and self._is_sensor(id_a):
                 sensor_id = id_a
             if sensor_id and sensor_id not in self._collected_sensors:
-                self._sensor_target_id = sensor_id
+                sensor = self._entities.get(sensor_id)
+                if sensor:
+                    row, col = self._grid.coords_to_cell(sensor["lat"], sensor["lng"])
+                    self._sensor_target_id = sensor_id
+                    self._abandon_waypoint()
+                    self._navigate_to(row, col)
                 break
 
     def _on_cam(self, payload: dict):
@@ -309,11 +314,19 @@ class DroneAgent:
             if self._grid.get(row, col) == CellState.CLAIMED:
                 self._grid.set(row, col, CellState.UNKNOWN)
 
-    def _tick_exploring(self):
-        if self._sensor_target_id is not None:
-            self._tick_goto_sensor()
-            return
+    def _navigate_to(self, row: int, col: int):
+        """Set waypoint to (row, col), claiming the cell if it is currently UNKNOWN.
+        Used uniformly for both traversal cells and sensor cells."""
+        self._waypoint = (row, col)
+        self._waypoint_pos = self._grid.cell_to_coords(row, col)
+        if self._grid.get(row, col) == CellState.UNKNOWN:
+            self._grid.set(row, col, CellState.CLAIMED)
+            cell_idx = self._grid.cell_index(row, col)
+            cell_lat, cell_lng = self._waypoint_pos
+            validity = max(10, int(self._cell_size_m / DRONE_SPEED * 4))
+            self._publish_cell_state(cell_idx, 0, cell_lat, cell_lng, validity)
 
+    def _tick_exploring(self):
         if self._waypoint is None:
             nxt = self._traversal.next_waypoint(self._grid, (self._lat, self._lng))
             if nxt is None:
@@ -323,13 +336,7 @@ class DroneAgent:
                 print(f"Drone {DRONE_ID} all cells covered → RETURNING", flush=True)
                 self._state = State.RETURNING
                 return
-            self._waypoint = nxt
-            self._waypoint_pos = self._grid.cell_to_coords(*nxt)
-            self._grid.set(*nxt, CellState.CLAIMED)
-            cell_idx = self._grid.cell_index(*nxt)
-            cell_lat, cell_lng = self._waypoint_pos
-            validity = max(10, int(self._cell_size_m / DRONE_SPEED * 4))
-            self._publish_cell_state(cell_idx, 0, cell_lat, cell_lng, validity)
+            self._navigate_to(*nxt)
 
         target_lat, target_lng = self._waypoint_pos
         step = DRONE_SPEED * (TICK_MS / 1000)
@@ -344,33 +351,17 @@ class DroneAgent:
             print(f"Drone {DRONE_ID} visited ({row},{col})", flush=True)
             self._waypoint = None
             self._waypoint_pos = None
+            if self._sensor_target_id is not None:
+                sensor_id = self._sensor_target_id
+                self._sensor_target_id = None
+                self._state = State.COLLECTING
+                try:
+                    self._collect_sensor(sensor_id)
+                finally:
+                    self._state = State.EXPLORING
         else:
             self._heading = _heading_deg(self._lat, self._lng, target_lat, target_lng)
             self._lat, self._lng = _step_toward(self._lat, self._lng, target_lat, target_lng, step)
-
-    def _tick_goto_sensor(self):
-        """Navigate to the target sensor's position, then collect once arrived."""
-        sensor = self._entities.get(self._sensor_target_id)
-        if sensor is None:
-            return  # Entity info not yet received; wait
-
-        slat, slng = sensor["lat"], sensor["lng"]
-        step = DRONE_SPEED * (TICK_MS / 1000)
-        dist = _distance_m(self._lat, self._lng, slat, slng)
-
-        if dist <= step:
-            self._lat, self._lng = slat, slng
-            sensor_id = self._sensor_target_id
-            self._sensor_target_id = None
-            self._abandon_waypoint()
-            self._state = State.COLLECTING
-            try:
-                self._collect_sensor(sensor_id)
-            finally:
-                self._state = State.EXPLORING
-        else:
-            self._heading = _heading_deg(self._lat, self._lng, slat, slng)
-            self._lat, self._lng = _step_toward(self._lat, self._lng, slat, slng, step)
 
     def _abandon_waypoint(self):
         """Revert a claimed-but-unvisited waypoint back to UNKNOWN so it can be re-claimed."""
