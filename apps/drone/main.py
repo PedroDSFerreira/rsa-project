@@ -329,13 +329,7 @@ class DroneAgent:
             cell_idx = self._grid.cell_index(*nxt)
             cell_lat, cell_lng = self._waypoint_pos
             validity = max(10, int(self._cell_size_m / DRONE_SPEED * 4))
-            self._vanetza.publish_denm(
-                cell_lat, cell_lng,
-                sub_cause_code=0,
-                cell_index=cell_idx,
-                station_id=DRONE_ID,
-                validity_duration=validity,
-            )
+            self._publish_cell_state(cell_idx, 0, cell_lat, cell_lng, validity)
 
         target_lat, target_lng = self._waypoint_pos
         step = DRONE_SPEED * (TICK_MS / 1000)
@@ -346,12 +340,7 @@ class DroneAgent:
             row, col = self._waypoint
             self._grid.set(row, col, CellState.VISITED)
             cell_idx = self._grid.cell_index(row, col)
-            self._vanetza.publish_denm(
-                target_lat, target_lng,
-                sub_cause_code=1,
-                cell_index=cell_idx,
-                station_id=DRONE_ID,
-            )
+            self._publish_cell_state(cell_idx, 1, target_lat, target_lng)
             print(f"Drone {DRONE_ID} visited ({row},{col})", flush=True)
             self._waypoint = None
             self._waypoint_pos = None
@@ -406,6 +395,17 @@ class DroneAgent:
 
     # ── Sensor collection & data delivery ──────────────────────────────────
 
+    def _publish_cell_state(self, cell_idx: int, sub_cause: int, lat: float, lng: float, validity: int = 60):
+        """Publish cell state as a DENM. Vanetza echoes it to vanetza/time/denm (VANETZA_DENM_MQTT_TIME_ENABLED=true),
+        which the remote broker bridge forwards to mqtt-central for dashboard consumption."""
+        self._vanetza.publish_denm(
+            lat, lng,
+            sub_cause_code=sub_cause,
+            cell_index=cell_idx,
+            station_id=DRONE_ID,
+            validity_duration=validity,
+        )
+
     def _collect_sensor(self, sensor_id: int):
         self._collected_sensors.add(sensor_id)
         sensor = self._entities.get(sensor_id)
@@ -439,12 +439,7 @@ class DroneAgent:
         row, col = self._grid.coords_to_cell(slat, slng)
         self._grid.set(row, col, CellState.SENSOR_FOUND)
         cell_idx = self._grid.cell_index(row, col)
-        self._vanetza.publish_denm(
-            slat, slng,
-            sub_cause_code=2,
-            cell_index=cell_idx,
-            station_id=DRONE_ID,
-        )
+        self._publish_cell_state(cell_idx, 2, slat, slng)
         print(f"Drone {DRONE_ID} collected sensor {sensor_id} → {len(self._collected_data)} total", flush=True)
 
     def _deliver_data(self):

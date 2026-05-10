@@ -1,5 +1,4 @@
 import json
-import math
 import os
 
 import paho.mqtt.client as mqtt
@@ -20,7 +19,6 @@ def _on_connect(client, userdata, flags, reason_code, properties):
     client.subscribe("+/vanetza/time/cam")
     client.subscribe("+/vanetza/time/denm")
     client.subscribe("+/vanetza/out/denm")
-    client.subscribe("sensor/+/response/+")
 
 
 def _on_message(client, userdata, msg):
@@ -67,37 +65,25 @@ def _on_message(client, userdata, msg):
             pass
 
     elif "/vanetza/time/denm" in topic:
+        # Primary: echo of the drone's own sent DENM (VANETZA_DENM_MQTT_TIME_ENABLED=true).
+        # Payload is the original vanetza/in/denm JSON plus Vanetza's timestamps.
         try:
             encoded = payload["management"]["actionId"]["sequenceNumber"]
             cell_index, sub_cause = divmod(encoded, 4)
-            new_state = sub_cause + 1
+            new_state = sub_cause + 1  # 0→CLAIMED(1), 1→VISITED(2), 2→SENSOR_FOUND(3)
             if new_state > state.grid_cells.get(cell_index, 0):
                 state.grid_cells[cell_index] = new_state
         except (KeyError, TypeError):
             pass
 
-    elif topic.startswith("sensor/") and "/response/" in topic:
-        try:
-            sensor_id = int(topic.split("/")[1])
-            sensor = state.entities.get(sensor_id)
-            m = state.grid_map
-            if sensor and m:
-                meters_per_lat = 111000.0
-                meters_per_lng = 111000.0 * math.cos(math.radians(m["sw_lat"]))
-                cols = math.ceil(m["width_m"] / m["cell_size_m"])
-                row = int((sensor.lat - m["sw_lat"]) * meters_per_lat / m["cell_size_m"])
-                col = int((sensor.lng - m["sw_lng"]) * meters_per_lng / m["cell_size_m"])
-                cell_index = row * cols + col
-                state.grid_cells[cell_index] = 3  # SENSOR_FOUND
-        except (KeyError, ValueError, TypeError):
-            pass
-
     elif "/vanetza/out/denm" in topic:
+        # DENMs received from the network by another Vanetza entity — use as a
+        # secondary source so inter-vehicle DENM exchange is also reflected.
         try:
             denm = payload.get("fields", {}).get("denm") or payload
             encoded = denm["management"]["actionId"]["sequenceNumber"]
             cell_index, sub_cause = divmod(encoded, 4)
-            new_state = sub_cause + 1  # 0→1(CLAIMED), 1→2(VISITED), 2→3(SENSOR_FOUND)
+            new_state = sub_cause + 1  # 0→CLAIMED(1), 1→VISITED(2), 2→SENSOR_FOUND(3)
             if new_state > state.grid_cells.get(cell_index, 0):
                 state.grid_cells[cell_index] = new_state
         except (KeyError, TypeError):
