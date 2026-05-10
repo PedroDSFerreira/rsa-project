@@ -1,4 +1,5 @@
 import json
+import math
 import os
 
 import paho.mqtt.client as mqtt
@@ -19,6 +20,7 @@ def _on_connect(client, userdata, flags, reason_code, properties):
     client.subscribe("+/vanetza/time/cam")
     client.subscribe("+/vanetza/time/denm")
     client.subscribe("+/vanetza/out/denm")
+    client.subscribe("sensor/+/response/+")
 
 
 def _on_message(client, userdata, msg):
@@ -72,6 +74,22 @@ def _on_message(client, userdata, msg):
             if new_state > state.grid_cells.get(cell_index, 0):
                 state.grid_cells[cell_index] = new_state
         except (KeyError, TypeError):
+            pass
+
+    elif topic.startswith("sensor/") and "/response/" in topic:
+        try:
+            sensor_id = int(topic.split("/")[1])
+            sensor = state.entities.get(sensor_id)
+            m = state.grid_map
+            if sensor and m:
+                meters_per_lat = 111000.0
+                meters_per_lng = 111000.0 * math.cos(math.radians(m["sw_lat"]))
+                cols = math.ceil(m["width_m"] / m["cell_size_m"])
+                row = int((sensor.lat - m["sw_lat"]) * meters_per_lat / m["cell_size_m"])
+                col = int((sensor.lng - m["sw_lng"]) * meters_per_lng / m["cell_size_m"])
+                cell_index = row * cols + col
+                state.grid_cells[cell_index] = 3  # SENSOR_FOUND
+        except (KeyError, ValueError, TypeError):
             pass
 
     elif "/vanetza/out/denm" in topic:
