@@ -16,6 +16,7 @@ def _serialise():
         "links": state.links,
         "grid_map": state.grid_map,
         "grid_cells": state.grid_cells,
+        "deliveries": list(state.deliveries),
         "tick": state.tick,
     }
 

@@ -19,6 +19,7 @@ def _on_connect(client, userdata, flags, reason_code, properties):
     client.subscribe("+/vanetza/time/cam")
     client.subscribe("+/vanetza/time/denm")
     client.subscribe("+/vanetza/out/denm")
+    client.subscribe("sim/delivery/+")
 
 
 def _on_message(client, userdata, msg):
@@ -88,6 +89,13 @@ def _on_message(client, userdata, msg):
             if new_state > state.grid_cells.get(cell_index, 0):
                 state.grid_cells[cell_index] = new_state
         except (KeyError, TypeError):
+            pass
+
+    elif topic.startswith("sim/delivery/"):
+        try:
+            sensor_id = int(payload["sensor_id"])
+            state.deliveries.add(sensor_id)
+        except (KeyError, ValueError, TypeError):
             pass
 
 

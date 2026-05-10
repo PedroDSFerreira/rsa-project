@@ -92,7 +92,17 @@ class BaseStationAgent:
 
     def _on_message(self, client, userdata, msg):
         payload = json.loads(msg.payload)
-        print(f"Data delivery received: {json.dumps(payload)}", flush=True)
+        drone_id = payload.get("drone_id")
+        sensors = payload.get("data", [])
+        print(f"Data delivery from drone {drone_id}: {len(sensors)} sensor(s)", flush=True)
+        for entry in sensors:
+            sensor_id = entry["sensor_id"]
+            self._central.publish(
+                f"sim/delivery/{sensor_id}",
+                json.dumps({"sensor_id": sensor_id, "drone_id": drone_id}),
+                retain=True,
+            )
+            print(f"Reported delivery: sensor {sensor_id}", flush=True)
 
     def run(self):
         self._central.connect(MQTT_CENTRAL_HOST, MQTT_CENTRAL_PORT)

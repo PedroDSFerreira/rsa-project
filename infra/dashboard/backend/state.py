@@ -17,6 +17,7 @@ class SimState:
     links: list[list[int]] = field(default_factory=list)
     grid_map: dict = field(default_factory=dict)
     grid_cells: dict[int, int] = field(default_factory=dict)  # cell_index → state (1=CLAIMED, 2=VISITED, 3=SENSOR_FOUND)
+    deliveries: set = field(default_factory=set)              # sensor_ids delivered to base station
     tick: int = 0
 
 
