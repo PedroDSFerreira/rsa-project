@@ -33,10 +33,11 @@ class VanetzaClient:
                 cb(payload)
         elif msg.topic == "vanetza/time/denm":
             try:
-                seq = payload["management"]["actionId"]["sequenceNumber"]
+                denm = payload.get("fields", {}).get("denm") or payload
+                seq = denm["management"]["actionId"]["sequenceNumber"]
                 print(f"[vanetza] time/denm echo received: seq={seq}", flush=True)
             except (KeyError, TypeError):
-                print(f"[vanetza] time/denm echo received (unparseable)", flush=True)
+                print(f"[vanetza] time/denm echo received (unparseable): {payload}", flush=True)
 
     def on_cam(self, callback):
         self._cam_callbacks.append(callback)

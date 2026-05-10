@@ -66,9 +66,10 @@ def _on_message(client, userdata, msg):
 
     elif "/vanetza/time/denm" in topic:
         # Primary: echo of the drone's own sent DENM (VANETZA_DENM_MQTT_TIME_ENABLED=true).
-        # Payload is the original vanetza/in/denm JSON plus Vanetza's timestamps.
+        # Vanetza wraps the decoded DENM under fields.denm, same as vanetza/out/denm.
         try:
-            encoded = payload["management"]["actionId"]["sequenceNumber"]
+            denm = payload.get("fields", {}).get("denm") or payload
+            encoded = denm["management"]["actionId"]["sequenceNumber"]
             cell_index, sub_cause = divmod(encoded, 4)
             new_state = sub_cause + 1  # 0→CLAIMED(1), 1→VISITED(2), 2→SENSOR_FOUND(3)
             if new_state > state.grid_cells.get(cell_index, 0):
