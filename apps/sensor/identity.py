@@ -19,7 +19,7 @@ class SensorIdentity:
 def resolve() -> SensorIdentity:
     name = _container_name()
     index = int(name.rsplit("-", 1)[-1])
-    station_id = 20 + index
+    station_id = 2000 + index
     mac = f"6e:06:e0:03:01:{index:02x}"
     lat, lng = _compute_gps(station_id)
     return SensorIdentity(station_id=station_id, mac=mac, container_name=name, lat=lat, lng=lng)

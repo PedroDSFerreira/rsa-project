@@ -7,7 +7,7 @@ CONTAINER_NAME=$(curl -sf --unix-socket /var/run/docker.sock \
     | python3 -c "import sys,json; print(json.load(sys.stdin)['Name'].lstrip('/'))")
 INDEX=$(echo "$CONTAINER_NAME" | rev | cut -d'-' -f1 | rev)
 
-export VANETZA_STATION_ID=$((10 + INDEX))
+export VANETZA_STATION_ID=$((1000 + INDEX))
 export VANETZA_STATION_TYPE=10
 export VANETZA_MAC_ADDRESS="6e:06:e0:03:02:$(printf '%02x' "$INDEX")"
 export VANETZA_INTERFACE=br0

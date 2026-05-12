@@ -241,7 +241,7 @@ class DroneAgent:
         )
         self._cell_size_m = m["cell_size_m"]
 
-        drone_index = DRONE_ID - 10
+        drone_index = DRONE_ID - 1000
         strip_data = next(s for s in payload["strips"] if s["drone_index"] == drone_index)
         self._strip = Strip(row_min=strip_data["row_min"], row_max=strip_data["row_max"])
         self._traversal = make_traversal(payload["algorithm"], self._strip, self._grid.cols)
