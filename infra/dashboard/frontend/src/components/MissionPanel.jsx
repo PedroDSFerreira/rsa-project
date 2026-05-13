@@ -19,7 +19,7 @@ const BTN = { width: '100%', padding: '10px', borderRadius: '6px', border: 'none
 const BTN_SENT = { ...BTN, background: '#37474f', cursor: 'default' }
 
 export default function MissionPanel() {
-  const { meta, entities, links, tick, deliveries } = useSim()
+  const { meta, entities, links, tick } = useSim()
   const [started, setStarted] = useState(false)
 
   function handleStart() {
@@ -54,22 +54,6 @@ export default function MissionPanel() {
         <div style={ROW}><span>Drones</span><span>{drones.length} / {meta?.num_drones ?? '?'}</span></div>
         <div style={ROW}><span>Sensors</span><span>{sensors.length} / {meta?.num_sensors ?? '?'}</span></div>
         <div style={ROW}><span>Active links</span><span>{links.length}</span></div>
-      </div>
-
-      <div style={SECTION}>
-        <div style={TITLE}>Data delivery</div>
-        <div style={ROW}>
-          <span>Sensors delivered</span>
-          <span>{deliveries.length} / {meta?.num_sensors ?? '?'}</span>
-        </div>
-        <div style={{ background: '#1a237e', borderRadius: '4px', overflow: 'hidden', height: '8px', marginTop: '4px' }}>
-          <div style={{
-            height: '100%',
-            width: `${meta?.num_sensors ? (deliveries.length / meta.num_sensors) * 100 : 0}%`,
-            background: '#42a5f5',
-            transition: 'width 0.4s ease',
-          }} />
-        </div>
       </div>
 
       <div style={SECTION}>

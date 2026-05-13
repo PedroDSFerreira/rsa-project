@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useReducer } from 'react'
 const WS_URL = `ws://${window.location.hostname}:8000/ws`
 export const API_URL = `http://${window.location.hostname}:8000`
 
-const initialState = { meta: {}, entities: {}, links: [], grid_map: {}, grid_cells: {}, deliveries: [], tick: 0 }
+const initialState = { meta: {}, entities: {}, links: [], grid_map: {}, grid_cells: {}, tick: 0 }
 
 function reducer(state, action) {
   if (action.type === 'update') return { ...state, ...action.payload }
