@@ -13,6 +13,8 @@ RUN pip3 install --no-cache-dir \
 
 COPY init.sh /init.sh
 RUN chmod +x /init.sh
-COPY main.py vanetza_client.py coverage_grid.py traversal.py grid_sync.py ./
+COPY main.py coverage_grid.py ./
+COPY algorithms/ ./algorithms/
+COPY comms/ ./comms/
 
 ENTRYPOINT ["/init.sh"]

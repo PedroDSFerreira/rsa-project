@@ -10,10 +10,11 @@ from enum import Enum, auto
 
 import paho.mqtt.client as mqtt
 
+from algorithms import GreedyNearestTraversal, make_traversal
+from comms.cell_radio import CellRadio
+from comms.grid_sync import GridSync
+from comms.vanetza_client import VanetzaClient
 from coverage_grid import CellState, CoverageGrid
-from grid_sync import GridSync
-from traversal import GreedyNearestTraversal, Strip, make_traversal
-from vanetza_client import VanetzaClient
 
 DRONE_ID = int(os.environ["VANETZA_STATION_ID"])
 DRONE_LAT = float(os.environ["VANETZA_LATITUDE"])
@@ -76,14 +77,14 @@ class DroneAgent:
         self._lng = DRONE_LNG
         self._heading = 0.0
 
-        # Discovered at runtime — not assumed from env
         self._base_location: tuple[float, float] | None = None
-        self._pending_start: dict | None = None  # sim/start buffered until base location is known
+        self._pending_start: dict | None = None
 
         self._grid: CoverageGrid | None = None
-        self._strip: Strip | None = None
-        self._traversal = None
+        self._row_min: int = 0
+        self._row_max: int = 0
         self._cell_size_m = 50.0
+        self._traversal = None
         self._waypoint: tuple[int, int] | None = None
         self._waypoint_pos: tuple[float, float] | None = None
         self._grid_sync: GridSync | None = None
@@ -91,11 +92,10 @@ class DroneAgent:
         self._claim_expiry: dict[int, float] = {}
 
         self._entities: dict[int, dict] = {}
-        self._in_range_peers: set[int] = set()  # updated from sim/links; used when MAC filtering is unavailable
         self._collected_data: list[dict] = []
         self._collected_sensors: set[int] = set()
-        self._sensor_target_id: int | None = None       # sensor to navigate to before collecting
-        self._current_collection_sensor_id: int | None = None  # guards response handler
+        self._sensor_target_id: int | None = None
+        self._current_collection_sensor_id: int | None = None
         self._at_base_delivered = False
         self._sensor_response: dict | None = None
         self._sensor_response_event = threading.Event()
@@ -104,11 +104,14 @@ class DroneAgent:
         self._central.on_connect = self._on_central_connect
         self._central.on_message = self._on_central_message
 
-        self._vanetza = VanetzaClient(client_id=f"drone-vanetza-{DRONE_ID}")
-        self._vanetza.on_cam(self._on_cam)
-        self._vanetza.on_denm(self._on_denm)
+        vanetza = VanetzaClient(client_id=f"drone-vanetza-{DRONE_ID}")
+        self._radio = CellRadio(drone_id=DRONE_ID, vanetza=vanetza)
+        self._radio.on_base_location(self._on_base_location)
+        self._radio.on_peer_cam(self._on_peer_cam)
+        self._radio.on_cell_update(self._on_cell_update)
+        self._vanetza = vanetza
 
-    # ── MQTT handlers ──────────────────────────────────────────────────────
+    # ── MQTT central handlers ──────────────────────────────────────────────
 
     def _on_central_connect(self, client, userdata, flags, reason_code, properties):
         client.subscribe("sim/announce/+")
@@ -148,15 +151,13 @@ class DroneAgent:
             self._pending_start = payload
 
     def _on_links(self, payload: dict):
-        # Always keep the in-range peer set current (used as fallback when
-        # MAC-level ebtables filtering is unavailable, e.g. on WSL2).
         in_range: set[int] = set()
         for id_a, id_b in payload.get("connected", []):
             if id_a == DRONE_ID:
                 in_range.add(id_b)
             elif id_b == DRONE_ID:
                 in_range.add(id_a)
-        self._in_range_peers = in_range
+        self._radio.set_in_range_peers(in_range)
 
         if self._state not in (State.EXPLORING, State.COLLECTING):
             return
@@ -177,57 +178,31 @@ class DroneAgent:
                     self._navigate_to(row, col)
                 break
 
-    def _on_cam(self, payload: dict):
-        try:
-            params = payload["fields"]["cam"]["camParameters"]
-            st = params["basicContainer"].get("stationType")
-            if st == 15:
-                # Base station: always accept — needed for initial location discovery
-                pos = params["basicContainer"]["referencePosition"]
-                self._base_location = (pos["latitude"], pos["longitude"])
-                if self._state == State.IDLE and self._pending_start:
-                    self._start_exploring(self._pending_start)
-                    self._pending_start = None
-            elif st == 10:
-                sid = payload["stationID"]
-                # Application-level proximity filter: ignore peers not listed in sim/links.
-                # This is the fallback when MAC-level ebtables filtering is unavailable (e.g. WSL2).
-                if sid not in self._in_range_peers:
-                    return
-                if sid != DRONE_ID and self._grid_sync:
-                    if sid not in self._known_peers:
-                        self._known_peers.add(sid)
-                        self._grid_sync.on_peer_seen(sid)
-        except KeyError:
-            pass
+    # ── Radio event handlers ───────────────────────────────────────────────
 
-    def _on_denm(self, payload: dict):
+    def _on_base_location(self, lat: float, lng: float) -> None:
+        self._base_location = (lat, lng)
+        if self._state == State.IDLE and self._pending_start:
+            self._start_exploring(self._pending_start)
+            self._pending_start = None
+
+    def _on_peer_cam(self, peer_id: int) -> None:
+        if self._grid_sync and peer_id not in self._known_peers:
+            self._known_peers.add(peer_id)
+            self._grid_sync.on_peer_seen(peer_id)
+
+    def _on_cell_update(self, cell_index: int, state: CellState, validity: int) -> None:
         if self._grid is None:
             return
         try:
-            denm = payload.get("fields", {}).get("denm") or payload
-            mgmt = denm["management"]
-            originator = mgmt["actionId"]["originatingStationId"]
-            if originator == DRONE_ID:
-                return
-            # Application-level proximity filter (fallback when ebtables is unavailable)
-            if self._in_range_peers and originator not in self._in_range_peers:
-                return
-            encoded = mgmt["actionId"]["sequenceNumber"]
-            cell_index, sub_cause = divmod(encoded, 4)
-            validity = mgmt.get("validityDuration", 60)
             row, col = self._grid.cell_from_index(cell_index)
-            state_map = {0: CellState.CLAIMED, 1: CellState.VISITED, 2: CellState.SENSOR_FOUND}
-            new_state = state_map.get(sub_cause)
-            if new_state is None:
-                return
-            if new_state > self._grid.get(row, col):
-                self._grid.set(row, col, new_state)
-            if new_state == CellState.CLAIMED:
+            if state > self._grid.get(row, col):
+                self._grid.set(row, col, state)
+            if state == CellState.CLAIMED:
                 self._claim_expiry[cell_index] = time.monotonic() + validity
             elif cell_index in self._claim_expiry:
                 del self._claim_expiry[cell_index]
-        except (KeyError, IndexError, ValueError):
+        except (IndexError, ValueError):
             pass
 
     # ── Lifecycle ──────────────────────────────────────────────────────────
@@ -243,16 +218,16 @@ class DroneAgent:
 
         drone_index = DRONE_ID - 1000
         strip_data = next(s for s in payload["strips"] if s["drone_index"] == drone_index)
-        self._strip = Strip(row_min=strip_data["row_min"], row_max=strip_data["row_max"])
-        self._traversal = make_traversal(payload["algorithm"], self._strip, self._grid.cols)
+        self._row_min = strip_data["row_min"]
+        self._row_max = strip_data["row_max"]
+        self._traversal = make_traversal(payload["algorithm"], self._row_min, self._row_max, self._grid.cols)
         self._grid_sync = GridSync(DRONE_ID, self._grid, self._central)
         self._central.subscribe(self._grid_sync.topic)
 
         self._state = State.EXPLORING
         print(
             f"Drone {DRONE_ID} → EXPLORING "
-            f"(strip rows {self._strip.row_min}–{self._strip.row_max}, "
-            f"base at {self._base_location})",
+            f"(rows {self._row_min}–{self._row_max}, base at {self._base_location})",
             flush=True,
         )
 
@@ -289,7 +264,7 @@ class DroneAgent:
     # ── Tick ───────────────────────────────────────────────────────────────
 
     def _tick(self):
-        self._vanetza.publish_cam(self._lat, self._lng, self._heading, DRONE_SPEED)
+        self._radio.publish_cam(self._lat, self._lng, self._heading, DRONE_SPEED)
         self._expire_stale_claims()
 
         if self._state == State.IDLE:
@@ -315,8 +290,7 @@ class DroneAgent:
                 self._grid.set(row, col, CellState.UNKNOWN)
 
     def _navigate_to(self, row: int, col: int):
-        """Set waypoint to (row, col), claiming the cell if it is currently UNKNOWN.
-        Used uniformly for both traversal cells and sensor cells."""
+        """Set waypoint to (row, col), claiming the cell if it is currently UNKNOWN."""
         self._waypoint = (row, col)
         self._waypoint_pos = self._grid.cell_to_coords(row, col)
         if self._grid.get(row, col) == CellState.UNKNOWN:
@@ -324,13 +298,13 @@ class DroneAgent:
             cell_idx = self._grid.cell_index(row, col)
             cell_lat, cell_lng = self._waypoint_pos
             validity = max(10, int(self._cell_size_m / DRONE_SPEED * 4))
-            self._publish_cell_state(cell_idx, 0, cell_lat, cell_lng, validity)
+            self._radio.publish_cell_state(cell_idx, CellState.CLAIMED, cell_lat, cell_lng, validity)
 
     def _tick_exploring(self):
         if self._waypoint is None:
             nxt = self._traversal.next_waypoint(self._grid, (self._lat, self._lng))
             if nxt is None:
-                self._traversal = GreedyNearestTraversal()
+                self._traversal = GreedyNearestTraversal(row_min=self._row_min, row_max=self._row_max)
                 nxt = self._traversal.next_waypoint(self._grid, (self._lat, self._lng))
             if nxt is None:
                 print(f"Drone {DRONE_ID} all cells covered → RETURNING", flush=True)
@@ -347,7 +321,7 @@ class DroneAgent:
             row, col = self._waypoint
             self._grid.set(row, col, CellState.VISITED)
             cell_idx = self._grid.cell_index(row, col)
-            self._publish_cell_state(cell_idx, 1, target_lat, target_lng)
+            self._radio.publish_cell_state(cell_idx, CellState.VISITED, target_lat, target_lng)
             print(f"Drone {DRONE_ID} visited ({row},{col})", flush=True)
             self._waypoint = None
             self._waypoint_pos = None
@@ -386,17 +360,6 @@ class DroneAgent:
 
     # ── Sensor collection & data delivery ──────────────────────────────────
 
-    def _publish_cell_state(self, cell_idx: int, sub_cause: int, lat: float, lng: float, validity: int = 60):
-        """Publish cell state as a DENM. Vanetza echoes it to vanetza/time/denm (VANETZA_DENM_MQTT_TIME_ENABLED=true),
-        which the remote broker bridge forwards to mqtt-central for dashboard consumption."""
-        self._vanetza.publish_denm(
-            lat, lng,
-            sub_cause_code=sub_cause,
-            cell_index=cell_idx,
-            station_id=DRONE_ID,
-            validity_duration=validity,
-        )
-
     def _collect_sensor(self, sensor_id: int):
         self._collected_sensors.add(sensor_id)
         sensor = self._entities.get(sensor_id)
@@ -412,7 +375,6 @@ class DroneAgent:
             json.dumps({"requester_id": DRONE_ID}),
         )
 
-        # Wait for sensor acknowledgement (fast network round-trip)
         self._sensor_response_event.wait(timeout=5.0)
         self._current_collection_sensor_id = None
 
@@ -421,7 +383,6 @@ class DroneAgent:
             print(f"Drone {DRONE_ID} sensor {sensor_id} collection timed out", flush=True)
             return
 
-        # Simulate data transfer duration — drone stays put in COLLECTING state
         time.sleep(COLLECTION_TIME_S)
 
         self._collected_data.append({"sensor_id": sensor_id, "payload": data})
@@ -430,7 +391,7 @@ class DroneAgent:
         row, col = self._grid.coords_to_cell(slat, slng)
         self._grid.set(row, col, CellState.SENSOR_FOUND)
         cell_idx = self._grid.cell_index(row, col)
-        self._publish_cell_state(cell_idx, 2, slat, slng)
+        self._radio.publish_cell_state(cell_idx, CellState.SENSOR_FOUND, slat, slng)
         print(f"Drone {DRONE_ID} collected sensor {sensor_id} → {len(self._collected_data)} total", flush=True)
 
     def _deliver_data(self):
