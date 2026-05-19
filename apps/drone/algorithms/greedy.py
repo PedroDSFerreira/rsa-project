@@ -2,32 +2,38 @@ from __future__ import annotations
 
 import math
 
-from algorithms.base import Traversal
-from coverage_grid import CellState, CoverageGrid
+from algorithms.base import Algorithm
+from coverage_grid import CellState, CoverageGrid, Position
 
 
-class GreedyNearestTraversal(Traversal):
-    """Visits the nearest UNKNOWN cell greedily, optionally restricted to a row band."""
+class GreedyNearestTraversal(Algorithm):
+    """Visits the nearest UNKNOWN cell within the assigned zone at each step."""
 
-    def __init__(self, row_min: int | None = None, row_max: int | None = None):
-        self._row_min = row_min
-        self._row_max = row_max
+    def __init__(self) -> None:
+        self._row_min = 0
+        self._row_max = 0
 
-    def next_waypoint(
-        self,
-        grid: CoverageGrid,
-        position: tuple[float, float],
-    ) -> tuple[int, int] | None:
-        drone_row, drone_col = grid.coords_to_cell(*position)
-        best: tuple[int, int] | None = None
+    def setup(self, grid: CoverageGrid, start: Position, all_starts: list[Position]) -> None:
+        self._row_min = start.row
+        self._row_max = _zone_end_row(start, all_starts, grid.rows)
+
+    def next_waypoint(self, grid: CoverageGrid, position: tuple[float, float]) -> Position | None:
+        drone_pos = grid.coords_to_cell(*position)
+        best: Position | None = None
         best_dist = math.inf
-        row_start = self._row_min if self._row_min is not None else 0
-        row_end = self._row_max + 1 if self._row_max is not None else grid.rows
-        for row in range(row_start, row_end):
+        for row in range(self._row_min, self._row_max + 1):
             for col in range(grid.cols):
-                if grid.get(row, col) == CellState.UNKNOWN:
-                    dist = (row - drone_row) ** 2 + (col - drone_col) ** 2
+                pos = Position(row, col)
+                if grid.get(pos) == CellState.UNKNOWN:
+                    dist = (pos.row - drone_pos.row) ** 2 + (pos.col - drone_pos.col) ** 2
                     if dist < best_dist:
                         best_dist = dist
-                        best = (row, col)
+                        best = pos
         return best
+
+
+# ── Helpers ────────────────────────────────────────────────────────────────
+
+def _zone_end_row(start: Position, all_starts: list[Position], total_rows: int) -> int:
+    higher = sorted(p.row for p in all_starts if p.row > start.row)
+    return higher[0] - 1 if higher else total_rows - 1
