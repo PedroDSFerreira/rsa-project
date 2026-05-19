@@ -30,7 +30,6 @@ class DroneAgent:
         self._config = config
         self._state = State.IDLE
         self._entities: dict[int, dict] = {}
-        self._collected_sensors: set[int] = set()
         self._base_location: tuple[float, float] | None = None
         self._pending_start: dict | None = None
         self._at_base_delivered = False
@@ -106,12 +105,15 @@ class DroneAgent:
             print(f"Drone {self._config.drone_id} all cells covered → RETURNING", flush=True)
             self._state = State.RETURNING
         elif step.sensor_id is not None:
-            self._collected_sensors.add(step.sensor_id)
-            self._state = State.COLLECTING
-            try:
-                self._collector.collect(step.sensor_id, self._entities.get(step.sensor_id), self._navigator.grid, self._radio)
-            finally:
-                self._state = State.EXPLORING
+            sensor = self._entities.get(step.sensor_id)
+            if sensor and not self._navigator.is_sensor_found(sensor["lat"], sensor["lng"]):
+                self._state = State.COLLECTING
+                try:
+                    self._collector.collect(step.sensor_id, sensor, self._navigator.grid, self._radio)
+                finally:
+                    self._state = State.EXPLORING
+                if self._grid_sync and self._navigator.is_sensor_found(sensor["lat"], sensor["lng"]):
+                    self._grid_sync.broadcast_update()
 
     def _tick_returning(self) -> None:
         base_lat, base_lng = self._base_location
@@ -162,7 +164,7 @@ class DroneAgent:
                 in_range.add(id_a)
         self._radio.set_in_range_peers(in_range)
 
-        if self._state not in (State.EXPLORING, State.COLLECTING):
+        if self._state != State.EXPLORING:
             return
         for id_a, id_b in payload.get("connected", []):
             sensor_id = None
@@ -170,12 +172,14 @@ class DroneAgent:
                 sensor_id = id_b
             elif id_b == self._config.drone_id and self._is_sensor(id_a):
                 sensor_id = id_a
-            if sensor_id and sensor_id not in self._collected_sensors:
-                sensor = self._entities.get(sensor_id)
-                if sensor and not self._navigator.is_sensor_found(sensor["lat"], sensor["lng"]):
-                    if self._navigator.should_collect_sensor(sensor_id):
-                        self._navigator.redirect_to_sensor(sensor_id, sensor["lat"], sensor["lng"])
-                break
+            if not sensor_id:
+                continue
+            sensor = self._entities.get(sensor_id)
+            if not sensor or self._navigator.is_sensor_found(sensor["lat"], sensor["lng"]):
+                continue  # local map already shows this sensor as collected
+            if self._navigator.should_collect_sensor(sensor_id):
+                self._navigator.redirect_to_sensor(sensor_id, sensor["lat"], sensor["lng"])
+            break
 
     def _on_sensor_response(self, topic: str, payload: dict) -> None:
         try:

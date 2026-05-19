@@ -122,6 +122,8 @@ class Navigator:
             if state > self._grid.get(pos):
                 self._grid.set(pos, state)
                 if self._waypoint == pos and state >= CellState.VISITED:
+                    if state >= CellState.SENSOR_FOUND:
+                        self._sensor_target_id = None  # peer already collected it
                     self._abandon_waypoint()
                 if self._algorithm is not None:
                     self._algorithm.on_cell_update(self._grid, pos, state)
@@ -174,5 +176,6 @@ class Navigator:
         if self._sensor_target_id is not None:
             sensor_id = self._sensor_target_id
             self._sensor_target_id = None
-            return ExploringStep(sensor_id=sensor_id)
+            if self._grid.get(pos) < CellState.SENSOR_FOUND:
+                return ExploringStep(sensor_id=sensor_id)
         return ExploringStep()
