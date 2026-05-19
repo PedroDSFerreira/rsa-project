@@ -16,5 +16,6 @@ RUN chmod +x /init.sh
 COPY main.py coverage_grid.py ./
 COPY algorithms/ ./algorithms/
 COPY comms/ ./comms/
+COPY drone/ ./drone/
 
 ENTRYPOINT ["/init.sh"]

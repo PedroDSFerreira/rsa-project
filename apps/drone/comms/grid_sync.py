@@ -4,7 +4,7 @@ import json
 
 import paho.mqtt.client as mqtt
 
-from coverage_grid import CellState, CoverageGrid
+from coverage_grid import CellState, CoverageGrid, Position
 
 
 class GridSync:
@@ -32,11 +32,10 @@ class GridSync:
         self._merge(payload)
 
     def _publish_to(self, peer_id: int) -> None:
-        cells = [
-            [int(self._grid.get(r, c)) for c in range(self._grid.cols)]
-            for r in range(self._grid.rows)
-        ]
-        self._client.publish(f"sim/grid_sync/{peer_id}", json.dumps({"cells": cells}))
+        self._client.publish(
+            f"sim/grid_sync/{peer_id}",
+            json.dumps({"cells": self._grid.all_cells()}),
+        )
 
     def _merge(self, payload: dict) -> None:
         for r, row in enumerate(payload.get("cells", [])):
@@ -45,5 +44,6 @@ class GridSync:
                     incoming = CellState(raw)
                 except ValueError:
                     continue
-                if incoming > self._grid.get(r, c):
-                    self._grid.set(r, c, incoming)
+                pos = Position(r, c)
+                if incoming > self._grid.get(pos):
+                    self._grid.set(pos, incoming)
