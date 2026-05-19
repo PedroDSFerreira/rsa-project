@@ -97,6 +97,7 @@ class CellRadio:
             state = {0: CellState.CLAIMED, 1: CellState.VISITED, 2: CellState.SENSOR_FOUND}.get(sub_cause)
             if state is None:
                 return
+            print(f"[DENM {self._drone_id}] from {originator}: cell {cell_index} → {state.name}", flush=True)
             for cb in self._cell_update_callbacks:
                 cb(cell_index, state, validity)
         except (KeyError, IndexError, ValueError):
