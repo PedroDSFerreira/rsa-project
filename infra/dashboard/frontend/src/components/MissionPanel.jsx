@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSim, API_URL } from '../context/SimContext'
 
 const PANEL = {
@@ -17,13 +17,30 @@ const TITLE = { fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1p
 const ROW = { display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }
 const BTN = { width: '100%', padding: '10px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', background: '#1b5e20', color: '#fff' }
 const BTN_SENT = { ...BTN, background: '#37474f', cursor: 'default' }
+const SELECT = {
+  width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #1565c0',
+  background: '#0d1b2a', color: '#e0e0e0', fontSize: '13px', marginBottom: '8px', cursor: 'pointer',
+}
 
 export default function MissionPanel() {
   const { meta, entities, links, tick, deliveries } = useSim()
   const [started, setStarted] = useState(false)
+  const [algorithm, setAlgorithm] = useState('boustrophedon')
+  const [availableAlgorithms, setAvailableAlgorithms] = useState(['boustrophedon', 'greedy'])
+
+  useEffect(() => {
+    fetch(`${API_URL}/algorithms`)
+      .then((r) => r.json())
+      .then((list) => { setAvailableAlgorithms(list); setAlgorithm(list[0]) })
+      .catch(() => {})
+  }, [])
 
   function handleStart() {
-    fetch(`${API_URL}/start`, { method: 'POST' }).then(() => setStarted(true))
+    fetch(`${API_URL}/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ algorithm }),
+    }).then(() => setStarted(true))
   }
 
   const entityList = Object.values(entities)
@@ -39,8 +56,18 @@ export default function MissionPanel() {
     <div style={PANEL}>
       <div style={SECTION}>
         <div style={TITLE}>Control</div>
+        <select
+          style={SELECT}
+          value={algorithm}
+          onChange={(e) => setAlgorithm(e.target.value)}
+          disabled={started}
+        >
+          {availableAlgorithms.map((a) => (
+            <option key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)}</option>
+          ))}
+        </select>
         <button style={started ? BTN_SENT : BTN} onClick={handleStart} disabled={started}>
-          {started ? 'Mission started' : 'Start mission'}
+          {started ? `Mission started (${algorithm})` : 'Start mission'}
         </button>
       </div>
       <div style={SECTION}>

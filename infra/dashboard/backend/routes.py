@@ -1,10 +1,19 @@
 import asyncio
 import dataclasses
+import json
+from typing import Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 
 import mqtt_client
 from state import state
+
+AVAILABLE_ALGORITHMS = ["boustrophedon", "greedy"]
+
+
+class StartRequest(BaseModel):
+    algorithm: Optional[str] = None
 
 router = APIRouter()
 
@@ -26,10 +35,16 @@ def get_state():
     return _serialise()
 
 
+@router.get("/algorithms")
+def get_algorithms():
+    return AVAILABLE_ALGORITHMS
+
+
 @router.post("/start")
-def post_start():
-    mqtt_client.publish("sim/command/start", "{}")
-    return {"status": "sent"}
+def post_start(body: StartRequest = None):
+    algorithm = body.algorithm if body and body.algorithm in AVAILABLE_ALGORITHMS else AVAILABLE_ALGORITHMS[0]
+    mqtt_client.publish("sim/command/start", json.dumps({"algorithm": algorithm}))
+    return {"status": "sent", "algorithm": algorithm}
 
 
 @router.websocket("/ws")
