@@ -29,17 +29,22 @@ def _own_ip() -> str:
         return s.getsockname()[0]
 
 
-def _compute_strips() -> list[dict]:
+def _compute_drone_starts() -> list[dict]:
+    """Assign each drone a starting grid position (top-left of its zone).
+
+    Drones are ordered by ID (1001, 1002, …). Each one starts at the first
+    row of its equally-divided horizontal band. The algorithm running on each
+    drone infers its own zone boundary from the full list of start rows.
+    """
     rows = math.ceil(SIM_HEIGHT_M / CELL_SIZE_M)
     base_size = rows // NUM_DRONES
     remainder = rows % NUM_DRONES
-    strips = []
+    starts = []
     row = 0
     for i in range(1, NUM_DRONES + 1):
-        size = base_size + (1 if i <= remainder else 0)
-        strips.append({"drone_index": i, "row_min": row, "row_max": row + size - 1})
-        row += size
-    return strips
+        starts.append({"drone_id": 1000 + i, "row": row, "col": 0})
+        row += base_size + (1 if i <= remainder else 0)
+    return starts
 
 
 class BaseStationAgent:
@@ -69,9 +74,15 @@ class BaseStationAgent:
 
     def _on_central_message(self, client, userdata, msg):
         if msg.topic == "sim/command/start":
-            self._publish_sim_start(client)
+            try:
+                command = json.loads(msg.payload)
+                algorithm = command.get("algorithm") or TRAVERSAL_ALGORITHM
+            except (json.JSONDecodeError, AttributeError):
+                algorithm = TRAVERSAL_ALGORITHM
+            self._publish_sim_start(client, algorithm)
 
-    def _publish_sim_start(self, client):
+    def _publish_sim_start(self, client, algorithm: str):
+        drone_starts = _compute_drone_starts()
         sim_start = {
             "map": {
                 "sw_lat":      SIM_SW_LAT,
@@ -80,11 +91,11 @@ class BaseStationAgent:
                 "height_m":    SIM_HEIGHT_M,
                 "cell_size_m": CELL_SIZE_M,
             },
-            "algorithm": TRAVERSAL_ALGORITHM,
-            "strips":    _compute_strips(),
+            "algorithm":    algorithm,
+            "drone_starts": drone_starts,
         }
         client.publish("sim/start", json.dumps(sim_start), retain=True)
-        print(f"Published sim/start with {NUM_DRONES} strips", flush=True)
+        print(f"Published sim/start: algorithm={algorithm}, {len(drone_starts)} drones", flush=True)
 
     def _on_local_connect(self, client, userdata, flags, reason_code, properties):
         client.subscribe("sim/base/data_delivery")
