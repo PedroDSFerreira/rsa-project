@@ -94,7 +94,7 @@ def _on_message(client, userdata, msg):
     elif topic.startswith("sim/delivery/"):
         try:
             sensor_id = int(payload["sensor_id"])
-            state.deliveries.add(sensor_id)
+            state.deliveries[sensor_id] = state.deliveries.get(sensor_id, 0) + 1
         except (KeyError, ValueError, TypeError):
             pass
 

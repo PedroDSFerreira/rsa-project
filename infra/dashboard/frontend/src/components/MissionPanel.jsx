@@ -85,18 +85,40 @@ export default function MissionPanel() {
 
       <div style={SECTION}>
         <div style={TITLE}>Data delivery</div>
-        <div style={ROW}>
-          <span>Sensors delivered</span>
-          <span>{deliveries.length} / {meta?.num_sensors ?? '?'}</span>
-        </div>
-        <div style={{ background: '#1a237e', borderRadius: '4px', overflow: 'hidden', height: '8px', marginTop: '4px' }}>
-          <div style={{
-            height: '100%',
-            width: `${meta?.num_sensors ? (deliveries.length / meta.num_sensors) * 100 : 0}%`,
-            background: '#42a5f5',
-            transition: 'width 0.4s ease',
-          }} />
-        </div>
+        {(() => {
+          const entries = Object.entries(deliveries)
+          const unique = entries.length
+          const duplicates = entries.filter(([, count]) => count > 1)
+          const total = entries.reduce((sum, [, count]) => sum + count, 0)
+          const numSensors = meta?.num_sensors ?? 0
+          return (
+            <>
+              <div style={ROW}>
+                <span>Unique sensors</span>
+                <span>{unique} / {numSensors || '?'}</span>
+              </div>
+              {duplicates.length > 0 && (
+                <div style={{ ...ROW, color: '#ef9a9a' }}>
+                  <span>Duplicate collections</span>
+                  <span>{total - unique}</span>
+                </div>
+              )}
+              <div style={{ background: '#1a237e', borderRadius: '4px', overflow: 'hidden', height: '8px', marginTop: '4px' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${numSensors ? (unique / numSensors) * 100 : 0}%`,
+                  background: duplicates.length > 0 ? '#ef9a9a' : '#42a5f5',
+                  transition: 'width 0.4s ease',
+                }} />
+              </div>
+              {duplicates.length > 0 && (
+                <div style={{ fontSize: '11px', color: '#ef9a9a', marginTop: '6px' }}>
+                  {duplicates.map(([id, count]) => `S${id}: ×${count}`).join('  ')}
+                </div>
+              )}
+            </>
+          )
+        })()}
       </div>
 
       <div style={SECTION}>
