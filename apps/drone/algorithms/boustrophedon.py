@@ -9,8 +9,7 @@ class BoustrophedonTraversal(Algorithm):
     """Covers the assigned zone in a lawnmower (boustrophedon) pattern.
 
     The zone end row is derived at setup time from the drone's starting Position
-    and the starting Positions of all other drones — no strip concept is exposed
-    externally.
+    and the starting Positions of all other drones.
     """
 
     def __init__(self) -> None:
