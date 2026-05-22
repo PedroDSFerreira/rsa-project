@@ -13,10 +13,17 @@ L.Icon.Default.mergeOptions({
 
 const ENTITY_COLORS = { drone: '#4fc3f7', sensor: '#81c784', base_station: '#ffb74d' }
 
-const CELL_STYLES = {
-  1: { color: '#4fc3f7', fillColor: '#90caf9', fillOpacity: 0.35, weight: 0 }, // CLAIMED
-  2: { color: '#81c784', fillColor: '#a5d6a7', fillOpacity: 0.45, weight: 0 }, // VISITED
-  3: { color: '#ff8f00', fillColor: '#ffb300', fillOpacity: 0.7,  weight: 0 }, // SENSOR_FOUND
+const CELL_STYLE_CLAIMED     = { color: '#4fc3f7', fillColor: '#90caf9', fillOpacity: 0.35, weight: 0 }
+const CELL_STYLE_SENSOR_FOUND = { color: '#ff8f00', fillColor: '#ffb300', fillOpacity: 0.7,  weight: 0 }
+
+// GitHub-style green heatmap for visited cells: 1 visit → lightest, maxCount → darkest
+const HEATMAP_COLORS = ['#9be9a8', '#40c463', '#30a14e', '#216e39', '#0d4821']
+
+function visitedStyle(count, maxCount) {
+  const idx = maxCount <= 1
+    ? 0
+    : Math.min(HEATMAP_COLORS.length - 1, Math.floor((count - 1) / (maxCount - 1) * (HEATMAP_COLORS.length - 1)))
+  return { fillColor: HEATMAP_COLORS[idx], fillOpacity: 0.65, weight: 0 }
 }
 
 function cellBounds(grid_map, cellIndex) {
@@ -71,7 +78,7 @@ function simAreaCenter(meta) {
 }
 
 export default function MapView() {
-  const { meta, entities, links, grid_map, grid_cells } = useSim()
+  const { meta, entities, links, grid_map, grid_cells, visit_counts } = useSim()
 
   const center = simAreaCenter(meta)
   const areaBounds = simAreaBounds(meta)
@@ -80,9 +87,18 @@ export default function MapView() {
 
   const gridRects = useMemo(() => {
     if (!grid_map.sw_lat) return []
+    const maxCount = Math.max(1, ...Object.values(visit_counts))
     return Object.entries(grid_cells).map(([idx, cellState]) => {
-      const style = CELL_STYLES[cellState]
-      if (!style) return null
+      let style
+      if (cellState === 1) {
+        style = CELL_STYLE_CLAIMED
+      } else if (cellState === 3) {
+        style = CELL_STYLE_SENSOR_FOUND
+      } else if (cellState === 2) {
+        style = visitedStyle(visit_counts[idx] ?? 1, maxCount)
+      } else {
+        return null
+      }
       return (
         <Rectangle
           key={idx}
@@ -91,7 +107,7 @@ export default function MapView() {
         />
       )
     }).filter(Boolean)
-  }, [grid_map, grid_cells])
+  }, [grid_map, grid_cells, visit_counts])
 
   const linkLines = links.map(([idA, idB]) => {
     const a = entities[idA]

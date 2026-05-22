@@ -17,6 +17,7 @@ def _on_connect(client, userdata, flags, reason_code, properties):
     client.subscribe("sim/links")
     client.subscribe("sim/start")
     client.subscribe("sim/algorithms")
+    client.subscribe("sim/drone/done/+")
     client.subscribe("+/vanetza/time/cam")
     client.subscribe("+/vanetza/time/denm")
     client.subscribe("+/vanetza/out/denm")
@@ -34,6 +35,12 @@ def _on_message(client, userdata, msg):
     if topic == "sim/algorithms":
         if isinstance(payload, list):
             state.algorithms = payload
+
+    elif topic.startswith("sim/drone/done/"):
+        try:
+            state.completed_drones.add(int(payload["drone_id"]))
+        except (KeyError, ValueError, TypeError):
+            pass
 
     elif topic == "sim/meta":
         state.meta = payload
@@ -80,6 +87,8 @@ def _on_message(client, userdata, msg):
             new_state = sub_cause + 1  # 0→CLAIMED(1), 1→VISITED(2), 2→SENSOR_FOUND(3)
             if new_state > state.grid_cells.get(cell_index, 0):
                 state.grid_cells[cell_index] = new_state
+            if new_state >= 2:  # VISITED or SENSOR_FOUND
+                state.visit_counts[cell_index] = state.visit_counts.get(cell_index, 0) + 1
         except (KeyError, TypeError):
             pass
 
@@ -93,6 +102,8 @@ def _on_message(client, userdata, msg):
             new_state = sub_cause + 1  # 0→CLAIMED(1), 1→VISITED(2), 2→SENSOR_FOUND(3)
             if new_state > state.grid_cells.get(cell_index, 0):
                 state.grid_cells[cell_index] = new_state
+            if new_state >= 2:  # VISITED or SENSOR_FOUND
+                state.visit_counts[cell_index] = state.visit_counts.get(cell_index, 0) + 1
         except (KeyError, TypeError):
             pass
 

@@ -23,15 +23,15 @@ const SELECT = {
 }
 
 export default function MissionPanel() {
-  const { meta, entities, links, tick, deliveries } = useSim()
+  const { meta, entities, links, tick, deliveries, completed_drones } = useSim()
   const [started, setStarted] = useState(false)
-  const [algorithm, setAlgorithm] = useState('boustrophedon')
-  const [availableAlgorithms, setAvailableAlgorithms] = useState(['boustrophedon', 'greedy'])
+  const [algorithm, setAlgorithm] = useState('')
+  const [availableAlgorithms, setAvailableAlgorithms] = useState([])
 
   useEffect(() => {
     fetch(`${API_URL}/algorithms`)
       .then((r) => r.json())
-      .then((list) => { setAvailableAlgorithms(list); setAlgorithm(list[0]) })
+      .then((list) => { if (list.length) { setAvailableAlgorithms(list); setAlgorithm(a => a || list[0]) } })
       .catch(() => {})
   }, [])
 
@@ -49,8 +49,11 @@ export default function MissionPanel() {
   const expected = (meta.num_drones ?? 0) + (meta.num_sensors ?? 0) + 1
   const allDiscovered = expected > 1 && entityList.length >= expected
 
-  const statusColor = allDiscovered ? '#81c784' : entityList.length > 0 ? '#ffb74d' : '#90caf9'
-  const statusText = allDiscovered ? '● Active' : entityList.length > 0 ? '○ Discovering entities…' : '○ Waiting…'
+  const numDrones = meta?.num_drones ?? 0
+  const missionDone = started && numDrones > 0 && completed_drones >= numDrones
+
+  const statusColor = missionDone ? '#ce93d8' : allDiscovered ? '#81c784' : entityList.length > 0 ? '#ffb74d' : '#90caf9'
+  const statusText = missionDone ? '✓ Mission complete' : allDiscovered ? '● Active' : entityList.length > 0 ? '○ Discovering entities…' : '○ Waiting…'
 
   return (
     <div style={PANEL}>
@@ -66,8 +69,8 @@ export default function MissionPanel() {
             <option key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)}</option>
           ))}
         </select>
-        <button style={started ? BTN_SENT : BTN} onClick={handleStart} disabled={started}>
-          {started ? `Mission started (${algorithm})` : 'Start mission'}
+        <button style={started ? BTN_SENT : BTN} onClick={handleStart} disabled={started || !algorithm}>
+          {started ? `Mission running (${algorithm})` : 'Start mission'}
         </button>
       </div>
       <div style={SECTION}>
@@ -79,6 +82,7 @@ export default function MissionPanel() {
         <div style={TITLE}>Mission</div>
         <div style={ROW}><span>Tick</span><span>{tick}</span></div>
         <div style={ROW}><span>Drones</span><span>{drones.length} / {meta?.num_drones ?? '?'}</span></div>
+        <div style={ROW}><span>Returned to base</span><span>{completed_drones} / {meta?.num_drones ?? '?'}</span></div>
         <div style={ROW}><span>Sensors</span><span>{sensors.length} / {meta?.num_sensors ?? '?'}</span></div>
         <div style={ROW}><span>Active links</span><span>{links.length}</span></div>
       </div>
@@ -123,16 +127,23 @@ export default function MissionPanel() {
 
       <div style={SECTION}>
         <div style={TITLE}>Grid legend</div>
-        {[
-          { color: '#90caf9', label: 'Claimed' },
-          { color: '#a5d6a7', label: 'Visited' },
-          { color: '#ffb300', label: 'Sensor found' },
-        ].map(({ color, label }) => (
-          <div key={label} style={{ ...ROW, alignItems: 'center' }}>
-            <span style={{ display: 'inline-block', width: 12, height: 12, background: color, borderRadius: 2, marginRight: 6 }} />
-            <span style={{ fontSize: '12px', flex: 1 }}>{label}</span>
+        <div style={{ ...ROW, alignItems: 'center' }}>
+          <span style={{ display: 'inline-block', width: 12, height: 12, background: '#90caf9', borderRadius: 2, marginRight: 6 }} />
+          <span style={{ fontSize: '12px', flex: 1 }}>Claimed</span>
+        </div>
+        <div style={{ ...ROW, alignItems: 'center', marginBottom: '4px' }}>
+          <span style={{ fontSize: '12px', marginRight: 6 }}>Visited</span>
+          <div style={{ display: 'flex', gap: 2, flex: 1 }}>
+            {['#9be9a8', '#40c463', '#30a14e', '#216e39', '#0d4821'].map((c, i) => (
+              <span key={i} style={{ flex: 1, height: 12, background: c, borderRadius: 2 }} />
+            ))}
           </div>
-        ))}
+          <span style={{ fontSize: '10px', color: '#aaa', marginLeft: 4 }}>×{'>'}1</span>
+        </div>
+        <div style={{ ...ROW, alignItems: 'center' }}>
+          <span style={{ display: 'inline-block', width: 12, height: 12, background: '#ffb300', borderRadius: 2, marginRight: 6 }} />
+          <span style={{ fontSize: '12px', flex: 1 }}>Sensor found</span>
+        </div>
       </div>
 
       <div style={SECTION}>

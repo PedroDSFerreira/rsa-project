@@ -16,9 +16,11 @@ class SimState:
     entities: dict[int, EntityInfo] = field(default_factory=dict)
     links: list[list[int]] = field(default_factory=list)
     grid_map: dict = field(default_factory=dict)
-    grid_cells: dict[int, int] = field(default_factory=dict)  # cell_index → state (1=CLAIMED, 2=VISITED, 3=SENSOR_FOUND)
-    deliveries: dict[int, int] = field(default_factory=dict)  # sensor_id → number of times delivered
+    grid_cells: dict[int, int] = field(default_factory=dict)   # cell_index → state (1=CLAIMED, 2=VISITED, 3=SENSOR_FOUND)
+    visit_counts: dict[int, int] = field(default_factory=dict) # cell_index → number of VISITED/SENSOR_FOUND DENMs received
+    deliveries: dict[int, int] = field(default_factory=dict)   # sensor_id → number of times delivered
     algorithms: list[str] = field(default_factory=list)
+    completed_drones: set[int] = field(default_factory=set)
     tick: int = 0
 
 

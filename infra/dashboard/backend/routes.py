@@ -23,7 +23,9 @@ def _serialise():
         "links": state.links,
         "grid_map": state.grid_map,
         "grid_cells": state.grid_cells,
+        "visit_counts": state.visit_counts,
         "deliveries": state.deliveries,
+        "completed_drones": len(state.completed_drones),
         "tick": state.tick,
     }
 
@@ -36,6 +38,17 @@ def get_state():
 @router.get("/algorithms")
 def get_algorithms():
     return state.algorithms
+
+
+@router.post("/reset")
+def post_reset():
+    state.deliveries = {}
+    state.grid_cells = {}
+    state.visit_counts = {}
+    state.grid_map = {}
+    state.completed_drones = set()
+    state.tick = 0
+    return {"status": "reset"}
 
 
 @router.post("/start")
