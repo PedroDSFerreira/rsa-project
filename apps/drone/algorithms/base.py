@@ -4,6 +4,18 @@ from abc import ABC, abstractmethod
 
 from coverage_grid import CellState, CoverageGrid, Position
 
+_registry: dict[str, type["Algorithm"]] = {}
+
+
+def register(name: str):
+    """Class decorator that registers an Algorithm subclass under *name*."""
+
+    def decorator(cls: type[Algorithm]) -> type[Algorithm]:
+        _registry[name] = cls
+        return cls
+
+    return decorator
+
 
 class Algorithm(ABC):
     """Base class for all coverage traversal algorithms.

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import math
 
-from algorithms.base import Algorithm
+from algorithms.base import Algorithm, register
 from coverage_grid import CellState, CoverageGrid, Position
 
 
+@register("greedy")
 class GreedyNearestTraversal(Algorithm):
     """Visits the nearest UNKNOWN cell within the assigned zone at each step."""
 

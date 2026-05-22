@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from algorithms.base import Algorithm
+from algorithms.base import Algorithm, register
 from coverage_grid import CellState, CoverageGrid, Position
 
 
+@register("boustrophedon")
 class BoustrophedonTraversal(Algorithm):
     """Covers the assigned zone in a lawnmower (boustrophedon) pattern.
 
