@@ -20,8 +20,6 @@ SIM_WIDTH_M = float(os.environ["SIM_AREA_WIDTH_M"])
 SIM_HEIGHT_M = float(os.environ["SIM_AREA_HEIGHT_M"])
 CELL_SIZE_M = float(os.environ["CELL_SIZE_M"])
 NUM_DRONES = int(os.environ["NUM_DRONES"])
-TRAVERSAL_ALGORITHM = os.getenv("TRAVERSAL_ALGORITHM", "boustrophedon")
-
 
 def _own_ip() -> str:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -75,10 +73,12 @@ class BaseStationAgent:
     def _on_central_message(self, client, userdata, msg):
         if msg.topic == "sim/command/start":
             try:
-                command = json.loads(msg.payload)
-                algorithm = command.get("algorithm") or TRAVERSAL_ALGORITHM
+                algorithm = json.loads(msg.payload).get("algorithm")
             except (json.JSONDecodeError, AttributeError):
-                algorithm = TRAVERSAL_ALGORITHM
+                algorithm = None
+            if not algorithm:
+                print("sim/command/start received with no algorithm — ignoring", flush=True)
+                return
             self._publish_sim_start(client, algorithm)
 
     def _publish_sim_start(self, client, algorithm: str):

@@ -6,7 +6,7 @@ from enum import Enum, auto
 
 import paho.mqtt.client as mqtt
 
-from algorithms import make_algorithm
+from algorithms import available_algorithms, make_algorithm
 from comms.cell_radio import CellRadio
 from comms.grid_sync import GridSync
 from comms.vanetza_client import VanetzaClient
@@ -128,6 +128,7 @@ class DroneAgent:
         client.subscribe("sim/start")
         client.subscribe("sim/links")
         client.subscribe(f"sensor/+/response/{self._config.drone_id}")
+        client.publish("sim/algorithms", json.dumps(available_algorithms()), retain=True)
         print(f"Drone {self._config.drone_id} connected to mqtt-central: {reason_code}", flush=True)
 
     def _on_central_message(self, client, userdata, msg) -> None:

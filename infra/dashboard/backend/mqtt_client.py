@@ -16,6 +16,7 @@ def _on_connect(client, userdata, flags, reason_code, properties):
     client.subscribe("sim/announce/+")
     client.subscribe("sim/links")
     client.subscribe("sim/start")
+    client.subscribe("sim/algorithms")
     client.subscribe("+/vanetza/time/cam")
     client.subscribe("+/vanetza/time/denm")
     client.subscribe("+/vanetza/out/denm")
@@ -30,7 +31,11 @@ def _on_message(client, userdata, msg):
 
     topic = msg.topic
 
-    if topic == "sim/meta":
+    if topic == "sim/algorithms":
+        if isinstance(payload, list):
+            state.algorithms = payload
+
+    elif topic == "sim/meta":
         state.meta = payload
 
     elif topic.startswith("sim/announce/"):

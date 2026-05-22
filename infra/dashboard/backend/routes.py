@@ -3,13 +3,11 @@ import dataclasses
 import json
 from typing import Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 import mqtt_client
 from state import state
-
-AVAILABLE_ALGORITHMS = ["boustrophedon", "greedy"]
 
 
 class StartRequest(BaseModel):
@@ -37,12 +35,16 @@ def get_state():
 
 @router.get("/algorithms")
 def get_algorithms():
-    return AVAILABLE_ALGORITHMS
+    return state.algorithms
 
 
 @router.post("/start")
 def post_start(body: StartRequest = None):
-    algorithm = body.algorithm if body and body.algorithm in AVAILABLE_ALGORITHMS else AVAILABLE_ALGORITHMS[0]
+    algorithm = body.algorithm if body else None
+    if not algorithm:
+        raise HTTPException(status_code=400, detail="algorithm is required")
+    if state.algorithms and algorithm not in state.algorithms:
+        raise HTTPException(status_code=400, detail=f"Unknown algorithm {algorithm!r}. Available: {state.algorithms}")
     mqtt_client.publish("sim/command/start", json.dumps({"algorithm": algorithm}))
     return {"status": "sent", "algorithm": algorithm}
 
