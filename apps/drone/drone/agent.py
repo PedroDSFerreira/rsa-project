@@ -33,7 +33,7 @@ class DroneAgent:
         self._base_location: tuple[float, float] | None = None
         self._pending_start: dict | None = None
         self._at_base_delivered = False
-        self._known_peers: set[int] = set()
+        self._in_range_peers: set[int] = set()
         self._grid_sync: GridSync | None = None
 
         self._central = mqtt.Client(
@@ -46,7 +46,6 @@ class DroneAgent:
         vanetza = VanetzaClient(client_id=f"drone-vanetza-{config.drone_id}")
         self._radio = CellRadio(drone_id=config.drone_id, vanetza=vanetza)
         self._radio.on_base_location(self._on_base_location)
-        self._radio.on_peer_cam(self._on_peer_cam)
         self._radio.on_cell_update(self._on_cell_update)
 
         self._navigator = Navigator(config, self._radio)
@@ -75,13 +74,24 @@ class DroneAgent:
 
     def run(self) -> None:
         tick_s = self._config.tick_ms / 1000
-        while True:
+
+        while self._state == State.IDLE:
+            time.sleep(tick_s)
+
+        while not (self._state == State.AT_BASE and self._at_base_delivered):
             start = time.monotonic()
             try:
                 self._tick()
             except Exception as e:
                 print(f"Drone {self._config.drone_id} tick error: {e}", flush=True)
             time.sleep(max(0, tick_s - (time.monotonic() - start)))
+
+        self._central.publish(
+            f"sim/drone/done/{self._config.drone_id}",
+            json.dumps({"drone_id": self._config.drone_id}),
+            retain=True,
+        )
+        print(f"Drone {self._config.drone_id} mission complete", flush=True)
 
     # ── Tick ───────────────────────────────────────────────────────────────
 
@@ -104,12 +114,12 @@ class DroneAgent:
         if step.done:
             print(f"Drone {self._config.drone_id} all cells covered → RETURNING", flush=True)
             self._state = State.RETURNING
-        elif step.sensor_id is not None:
-            sensor = self._entities.get(step.sensor_id)
-            if sensor and not self._navigator.is_sensor_found(sensor["lat"], sensor["lng"]):
+        elif step.arrived is not None:
+            sensor_id, sensor = self._sensor_at_cell(step.arrived)
+            if sensor_id and not self._navigator.is_sensor_found(sensor["lat"], sensor["lng"]):
                 self._state = State.COLLECTING
                 try:
-                    self._collector.collect(step.sensor_id, sensor, self._navigator.grid, self._radio)
+                    self._collector.collect(sensor_id, sensor, self._navigator.grid, self._radio)
                 finally:
                     self._state = State.EXPLORING
                 if self._grid_sync and self._navigator.is_sensor_found(sensor["lat"], sensor["lng"]):
@@ -165,22 +175,13 @@ class DroneAgent:
                 in_range.add(id_a)
         self._radio.set_in_range_peers(in_range)
 
-        if self._state != State.EXPLORING:
-            return
-        for id_a, id_b in payload.get("connected", []):
-            sensor_id = None
-            if id_a == self._config.drone_id and self._is_sensor(id_b):
-                sensor_id = id_b
-            elif id_b == self._config.drone_id and self._is_sensor(id_a):
-                sensor_id = id_a
-            if not sensor_id:
-                continue
-            sensor = self._entities.get(sensor_id)
-            if not sensor or self._navigator.is_sensor_found(sensor["lat"], sensor["lng"]):
-                continue  # local map already shows this sensor as collected
-            if self._navigator.should_collect_sensor(sensor_id):
-                self._navigator.redirect_to_sensor(sensor_id, sensor["lat"], sensor["lng"])
-            break
+        if self._grid_sync:
+            newly_connected = in_range - self._in_range_peers
+            for peer_id in newly_connected:
+                if self._is_drone(peer_id):
+                    self._grid_sync.on_peer_connected(peer_id)
+        self._in_range_peers = in_range
+
 
     def _on_sensor_response(self, topic: str, payload: dict) -> None:
         try:
@@ -195,11 +196,6 @@ class DroneAgent:
         if self._state == State.IDLE and self._pending_start:
             self._start_mission(self._pending_start)
             self._pending_start = None
-
-    def _on_peer_cam(self, peer_id: int) -> None:
-        if self._grid_sync and peer_id not in self._known_peers:
-            self._known_peers.add(peer_id)
-            self._grid_sync.on_peer_seen(peer_id)
 
     def _on_cell_update(self, cell_index: int, state: CellState, validity: int) -> None:
         self._navigator.on_cell_update(cell_index, state, validity)
@@ -231,6 +227,22 @@ class DroneAgent:
         )
 
     # ── Helpers ────────────────────────────────────────────────────────────
+
+    def _sensor_at_cell(self, pos) -> tuple[int, dict] | tuple[None, None]:
+        """Return the (sensor_id, entity) whose cell matches pos, or (None, None)."""
+        grid = self._navigator.grid
+        if grid is None:
+            return None, None
+        for sid, entity in self._entities.items():
+            if entity.get("entity_type") != "sensor":
+                continue
+            if grid.coords_to_cell(entity["lat"], entity["lng"]) == pos:
+                return sid, entity
+        return None, None
+
+    def _is_drone(self, station_id: int) -> bool:
+        entity = self._entities.get(station_id)
+        return entity is not None and entity.get("entity_type") == "drone"
 
     def _is_sensor(self, station_id: int) -> bool:
         entity = self._entities.get(station_id)

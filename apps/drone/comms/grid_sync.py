@@ -20,12 +20,10 @@ class GridSync:
     def topic(self) -> str:
         return f"sim/grid_sync/{self._station_id}"
 
-    def on_peer_seen(self, peer_id: int) -> None:
-        """Send our full grid snapshot to a peer the first time we see their CAM."""
-        if peer_id in self._synced_peers:
-            return
+    def on_peer_connected(self, peer_id: int) -> None:
+        """Send our full grid snapshot to a peer that just became a neighbour."""
         self._synced_peers.add(peer_id)
-        print(f"[GridSync {self._station_id}] initial sync → {peer_id}", flush=True)
+        print(f"[GridSync {self._station_id}] sync → {peer_id}", flush=True)
         self._publish_to(peer_id)
 
     def broadcast_update(self) -> None:

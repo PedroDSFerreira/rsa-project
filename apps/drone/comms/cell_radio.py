@@ -6,7 +6,6 @@ from comms.vanetza_client import VanetzaClient
 from coverage_grid import CellState
 
 BaseCamCallback = Callable[[float, float], None]   # (lat, lng)
-PeerCamCallback = Callable[[int], None             ]  # station_id
 CellUpdateCallback = Callable[[int, CellState, int], None]  # cell_index, state, validity
 
 
@@ -22,7 +21,6 @@ class CellRadio:
         self._vanetza = vanetza
         self._in_range_peers: set[int] = set()
         self._base_cam_callbacks: list[BaseCamCallback] = []
-        self._peer_cam_callbacks: list[PeerCamCallback] = []
         self._cell_update_callbacks: list[CellUpdateCallback] = []
         vanetza.on_cam(self._handle_cam)
         vanetza.on_denm(self._handle_denm)
@@ -32,9 +30,6 @@ class CellRadio:
 
     def on_base_location(self, callback: BaseCamCallback) -> None:
         self._base_cam_callbacks.append(callback)
-
-    def on_peer_cam(self, callback: PeerCamCallback) -> None:
-        self._peer_cam_callbacks.append(callback)
 
     def on_cell_update(self, callback: CellUpdateCallback) -> None:
         self._cell_update_callbacks.append(callback)
@@ -70,17 +65,10 @@ class CellRadio:
     def _handle_cam(self, payload: dict) -> None:
         try:
             params = payload["fields"]["cam"]["camParameters"]
-            st = params["basicContainer"].get("stationType")
-            if st == 15:
+            if params["basicContainer"].get("stationType") == 15:
                 pos = params["basicContainer"]["referencePosition"]
                 for cb in self._base_cam_callbacks:
                     cb(pos["latitude"], pos["longitude"])
-            elif st == 10:
-                sid = payload["stationID"]
-                if sid not in self._in_range_peers:
-                    return
-                for cb in self._peer_cam_callbacks:
-                    cb(sid)
         except KeyError:
             pass
 

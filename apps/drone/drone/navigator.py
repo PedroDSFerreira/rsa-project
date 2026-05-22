@@ -14,7 +14,7 @@ from drone.motion import distance_m, heading_deg, step_toward
 class ExploringStep:
     """Outcome of a single exploration tick."""
     done: bool = False
-    sensor_id: int | None = None  # set when the drone has just arrived at a sensor waypoint
+    arrived: Position | None = None  # set when the drone just reached a waypoint cell
 
 
 class Navigator:
@@ -36,7 +36,6 @@ class Navigator:
         self._cell_size_m = 50.0
         self._waypoint: Position | None = None
         self._waypoint_pos: tuple[float, float] | None = None
-        self._sensor_target_id: int | None = None
         self._claim_expiry: dict[int, float] = {}
 
     @property
@@ -55,20 +54,6 @@ class Navigator:
         self._cell_size_m = grid.cell_size_m
         self._algorithm = algorithm
         algorithm.setup(grid, start, all_starts)
-
-    def redirect_to_sensor(self, sensor_id: int, sensor_lat: float, sensor_lng: float) -> None:
-        """Interrupt the current traversal to navigate toward a nearby sensor."""
-        if self._sensor_target_id is not None or self._grid is None:
-            return
-        self._sensor_target_id = sensor_id
-        self._abandon_waypoint()
-        self._navigate_to(self._grid.coords_to_cell(sensor_lat, sensor_lng))
-
-    def should_collect_sensor(self, sensor_id: int) -> bool:
-        """Ask the algorithm whether this sensor should be collected."""
-        if self._algorithm is None:
-            return True
-        return self._algorithm.should_collect_sensor(sensor_id)
 
     def is_sensor_found(self, lat: float, lng: float) -> bool:
         """Return True if the local map already shows this sensor's cell as collected."""
@@ -122,8 +107,6 @@ class Navigator:
             if state > self._grid.get(pos):
                 self._grid.set(pos, state)
                 if self._waypoint == pos and state >= CellState.VISITED:
-                    if state >= CellState.SENSOR_FOUND:
-                        self._sensor_target_id = None  # peer already collected it
                     self._abandon_waypoint()
                 if self._algorithm is not None:
                     self._algorithm.on_cell_update(self._grid, pos, state)
@@ -173,9 +156,4 @@ class Navigator:
         print(f"Drone {self._config.drone_id} visited ({pos.row},{pos.col})", flush=True)
         self._waypoint = None
         self._waypoint_pos = None
-        if self._sensor_target_id is not None:
-            sensor_id = self._sensor_target_id
-            self._sensor_target_id = None
-            if self._grid.get(pos) < CellState.SENSOR_FOUND:
-                return ExploringStep(sensor_id=sensor_id)
-        return ExploringStep()
+        return ExploringStep(arrived=pos)
