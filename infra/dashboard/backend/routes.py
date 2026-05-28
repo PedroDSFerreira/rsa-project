@@ -45,6 +45,7 @@ def post_reset():
     state.deliveries = {}
     state.grid_cells = {}
     state.visit_counts = {}
+    state.cell_visitors = {}
     state.grid_map = {}
     state.completed_drones = set()
     state.tick = 0

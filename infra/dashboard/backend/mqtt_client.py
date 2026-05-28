@@ -82,12 +82,17 @@ def _on_message(client, userdata, msg):
         # Vanetza wraps the decoded DENM under fields.denm, same as vanetza/out/denm.
         try:
             denm = payload.get("fields", {}).get("denm") or payload
-            encoded = denm["management"]["actionId"]["sequenceNumber"]
+            mgmt = denm["management"]
+            encoded = mgmt["actionId"]["sequenceNumber"]
+            originating_id = mgmt["actionId"]["originatingStationId"]
             cell_index, sub_cause = divmod(encoded, 4)
             new_state = sub_cause + 1  # 0→CLAIMED(1), 1→VISITED(2), 2→SENSOR_FOUND(3)
             if new_state > state.grid_cells.get(cell_index, 0):
                 state.grid_cells[cell_index] = new_state
-                if new_state >= 2:  # VISITED or SENSOR_FOUND
+            if new_state >= 2:  # VISITED or SENSOR_FOUND
+                visitors = state.cell_visitors.setdefault(cell_index, set())
+                if originating_id not in visitors:
+                    visitors.add(originating_id)
                     state.visit_counts[cell_index] = state.visit_counts.get(cell_index, 0) + 1
         except (KeyError, TypeError):
             pass
@@ -97,12 +102,17 @@ def _on_message(client, userdata, msg):
         # secondary source so inter-vehicle DENM exchange is also reflected.
         try:
             denm = payload.get("fields", {}).get("denm") or payload
-            encoded = denm["management"]["actionId"]["sequenceNumber"]
+            mgmt = denm["management"]
+            encoded = mgmt["actionId"]["sequenceNumber"]
+            originating_id = mgmt["actionId"]["originatingStationId"]
             cell_index, sub_cause = divmod(encoded, 4)
             new_state = sub_cause + 1  # 0→CLAIMED(1), 1→VISITED(2), 2→SENSOR_FOUND(3)
             if new_state > state.grid_cells.get(cell_index, 0):
                 state.grid_cells[cell_index] = new_state
-                if new_state >= 2:  # VISITED or SENSOR_FOUND
+            if new_state >= 2:  # VISITED or SENSOR_FOUND
+                visitors = state.cell_visitors.setdefault(cell_index, set())
+                if originating_id not in visitors:
+                    visitors.add(originating_id)
                     state.visit_counts[cell_index] = state.visit_counts.get(cell_index, 0) + 1
         except (KeyError, TypeError):
             pass
