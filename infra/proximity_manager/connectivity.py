@@ -18,7 +18,7 @@ class ConnectivityMatrix:
                 unblock(a.container_name, b.mac)
                 unblock(b.container_name, a.mac)
             self._state[key] = True
-        elif not should_connect:
+        elif not should_connect and was_connected:
             if a.has_vanetza and b.has_vanetza:
                 block(a.container_name, b.mac)
                 block(b.container_name, a.mac)
