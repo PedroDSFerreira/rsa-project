@@ -23,7 +23,7 @@ const SELECT = {
 }
 
 export default function MissionPanel() {
-  const { meta, entities, links, tick, deliveries, completed_drones, visit_counts } = useSim()
+  const { meta, entities, links, tick, deliveries, completed_drones } = useSim()
   const [started, setStarted] = useState(false)
   const [algorithm, setAlgorithm] = useState('')
   const [availableAlgorithms, setAvailableAlgorithms] = useState([])
@@ -52,12 +52,6 @@ export default function MissionPanel() {
   const numDrones = meta?.num_drones ?? 0
   const missionDone = started && numDrones > 0 && completed_drones >= numDrones
 
-  const visitEntries = Object.values(visit_counts)
-  const uniqueCells = visitEntries.length
-  const totalVisits = visitEntries.reduce((sum, c) => sum + c, 0)
-  const efficiency = uniqueCells > 0 ? Math.round((uniqueCells / totalVisits) * 100) : null
-  const redundantVisits = totalVisits - uniqueCells
-
   const statusColor = missionDone ? '#ce93d8' : allDiscovered ? '#81c784' : entityList.length > 0 ? '#ffb74d' : '#90caf9'
   const statusText = missionDone ? '✓ Mission complete' : allDiscovered ? '● Active' : entityList.length > 0 ? '○ Discovering entities…' : '○ Waiting…'
 
@@ -83,37 +77,6 @@ export default function MissionPanel() {
         <div style={TITLE}>Status</div>
         <div style={{ fontSize: '13px', color: statusColor }}>{statusText}</div>
       </div>
-
-      {missionDone && efficiency !== null && (
-        <div style={{ ...SECTION, border: `1px solid ${efficiency === 100 ? '#2e7d32' : '#b71c1c'}` }}>
-          <div style={TITLE}>Coverage efficiency</div>
-          <div style={{ fontSize: '32px', fontWeight: 'bold', textAlign: 'center', color: efficiency === 100 ? '#66bb6a' : efficiency >= 80 ? '#ffa726' : '#ef5350', lineHeight: 1.1 }}>
-            {efficiency}%
-          </div>
-          <div style={{ background: '#1a237e', borderRadius: '4px', overflow: 'hidden', height: '8px', margin: '8px 0' }}>
-            <div style={{
-              height: '100%',
-              width: `${efficiency}%`,
-              background: efficiency === 100 ? '#66bb6a' : efficiency >= 80 ? '#ffa726' : '#ef5350',
-              transition: 'width 0.6s ease',
-            }} />
-          </div>
-          <div style={ROW}>
-            <span>Cells visited</span>
-            <span>{uniqueCells}</span>
-          </div>
-          <div style={ROW}>
-            <span>Total visits</span>
-            <span>{totalVisits}</span>
-          </div>
-          {redundantVisits > 0 && (
-            <div style={{ ...ROW, color: '#ef9a9a' }}>
-              <span>Redundant visits</span>
-              <span>{redundantVisits}</span>
-            </div>
-          )}
-        </div>
-      )}
 
       <div style={SECTION}>
         <div style={TITLE}>Mission</div>
