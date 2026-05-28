@@ -87,8 +87,8 @@ def _on_message(client, userdata, msg):
             new_state = sub_cause + 1  # 0→CLAIMED(1), 1→VISITED(2), 2→SENSOR_FOUND(3)
             if new_state > state.grid_cells.get(cell_index, 0):
                 state.grid_cells[cell_index] = new_state
-            if new_state >= 2:  # VISITED or SENSOR_FOUND
-                state.visit_counts[cell_index] = state.visit_counts.get(cell_index, 0) + 1
+                if new_state >= 2:  # VISITED or SENSOR_FOUND
+                    state.visit_counts[cell_index] = state.visit_counts.get(cell_index, 0) + 1
         except (KeyError, TypeError):
             pass
 
@@ -102,8 +102,8 @@ def _on_message(client, userdata, msg):
             new_state = sub_cause + 1  # 0→CLAIMED(1), 1→VISITED(2), 2→SENSOR_FOUND(3)
             if new_state > state.grid_cells.get(cell_index, 0):
                 state.grid_cells[cell_index] = new_state
-            if new_state >= 2:  # VISITED or SENSOR_FOUND
-                state.visit_counts[cell_index] = state.visit_counts.get(cell_index, 0) + 1
+                if new_state >= 2:  # VISITED or SENSOR_FOUND
+                    state.visit_counts[cell_index] = state.visit_counts.get(cell_index, 0) + 1
         except (KeyError, TypeError):
             pass
 
