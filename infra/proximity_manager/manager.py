@@ -22,6 +22,7 @@ class ProximityManager:
         _num_drones = int(os.getenv("NUM_DRONES", "0"))
         _num_sensors = int(os.getenv("NUM_SENSORS", "2"))
         self._expected: int = _num_drones + _num_sensors + 1  # +1 for base station
+        self._num_drones: int = _num_drones
         self._meta = {
             "sim_area": {
                 "sw_lat": float(os.getenv("SIM_AREA_SW_LAT", "40.630")),
@@ -35,6 +36,8 @@ class ProximityManager:
         self._entities: dict[int, Entity] = {}
         self._matrix = ConnectivityMatrix()
         self._tick = 0
+        self._mission_active = False
+        self._done_drones: set[int] = set()
         self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="proximity-manager")
         self._client.on_connect = self._on_connect
         self._client.on_message = self._on_message
@@ -43,6 +46,8 @@ class ProximityManager:
         print(f"Connected to mqtt-central: {reason_code}", flush=True)
         client.subscribe("sim/announce/+")
         client.subscribe("+/vanetza/time/cam")
+        client.subscribe("sim/start")
+        client.subscribe("sim/drone/done/+")
 
     def _on_message(self, client, userdata, msg):
         try:
@@ -53,6 +58,19 @@ class ProximityManager:
             self._handle_announce(payload)
         elif "/vanetza/time/cam" in msg.topic:
             self._handle_time_cam(payload)
+        elif msg.topic == "sim/start":
+            self._tick = 0
+            self._done_drones = set()
+            self._mission_active = True
+            print("Mission started — tick counter reset", flush=True)
+        elif msg.topic.startswith("sim/drone/done/"):
+            try:
+                self._done_drones.add(int(payload["drone_id"]))
+            except (KeyError, ValueError, TypeError):
+                pass
+            if self._num_drones > 0 and len(self._done_drones) >= self._num_drones:
+                self._mission_active = False
+                print(f"All {self._num_drones} drones done — tick counter stopped at {self._tick}", flush=True)
 
     def _handle_time_cam(self, payload: dict):
         try:
@@ -97,7 +115,8 @@ class ProximityManager:
             if in_range and not (a.entity_type == "sensor" and b.entity_type == "sensor"):
                 connected.append([a.station_id, b.station_id])
         self._client.publish("sim/links", json.dumps({"connected": connected, "tick": self._tick}))
-        self._tick += 1
+        if self._mission_active:
+            self._tick += 1
 
     def _block_all(self):
         for a, b in itertools.combinations(self._entities.values(), 2):
