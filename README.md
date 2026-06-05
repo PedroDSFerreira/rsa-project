@@ -1,8 +1,9 @@
-# RSA Project - Autonomous Forest Data Collection
+# Autonomous Forest Data Collection
 
 This repository simulates an autonomous drone fleet that sweeps a forest grid,
 detects static sensors, collects environmental readings, and delivers them to a
-base station. Coordination uses MQTT for control/data and V2X-style CAM/DENM
+base station.
+Coordination uses MQTT for control/data and V2X-style CAM/DENM
 messages for local awareness.
 
 ## Architecture overview
@@ -32,7 +33,7 @@ Prerequisites:
 
 - Docker and Docker Compose (v2).
 
-Optional: initialize a local environment file if you want to customize defaults:
+Initialize the local environment file:
 
 ```bash
 make prepare-env
