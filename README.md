@@ -1,3 +1,5 @@
+<img width="1556" height="970" alt="image" src="https://github.com/user-attachments/assets/1e7b8361-1022-442c-ac6d-459786b34643" />
+
 # Autonomous Forest Data Collection
 
 This repository simulates an autonomous drone fleet that sweeps a forest grid,
